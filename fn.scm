@@ -1,6 +1,5 @@
 
-(define (hello) display "Got data\n")
-(define (main)  display "OK\n" )
+(define (main) (display data)(newline))
 
 (display "Loaded script.\n")
 

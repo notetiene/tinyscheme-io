@@ -83,21 +83,18 @@ int main (int argc, char *argv[], char *arge[]) {
     }
     buffer[err] = '\0';
     if (err > 0) {
-      syslog(LOG_ERR, ">");
-
-      /*(void )scheme_apply0(sc, "hello");*/
       scheme_define(sc, sc->global_env, 
           mk_symbol (sc, "data"), 
           mk_counted_string(sc, (char *)buffer, err));
 
-      scheme_eval(sc, _cons(sc, mk_symbol(sc, "hello"), sc->NIL, 1));
-      /*(void )scheme_apply0(sc, "hello");*/
-      /*scheme_load_string(sc, "(display data)");*/
+      (void )scheme_apply0(sc, "main");
     }
   }
   close(skfd);
 
   scheme_deinit(sc);
+
+  closelog();
 
   return err;
 }
