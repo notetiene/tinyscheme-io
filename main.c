@@ -31,6 +31,18 @@ int main (int argc, char *argv[], char *arge[]) {
   FILE *file;
   scheme *sc;
 
+  int ch;
+
+  while ((ch = getopt(argc, argv, "p:")) != -1) {
+    switch(ch) {
+      case 'p':
+        port = atoi(optarg);
+        printf("using port %d\n", port);
+        break;
+    }
+  }
+
+
   openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
 
   sc = scheme_init_new ();
