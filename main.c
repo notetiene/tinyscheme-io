@@ -83,11 +83,18 @@ int main (int argc, char *argv[], char *arge[]) {
     }
     buffer[err] = '\0';
     if (err > 0) {
-      scheme_define(sc, sc->global_env, 
-          mk_symbol (sc, "data"), 
-          mk_counted_string(sc, (char *)buffer, err));
+      pointer vector;
+      int i;
+      vector = sc->vptr->mk_vector(sc, err);
+      for(i = 0; i < err; i++) {
+        sc->vptr->set_vector_elem(vector, i, mk_character(sc, buffer[i]));
+      }
+      sc->vptr->scheme_define(sc, sc->global_env, 
+          mk_symbol (sc, "data"),
+          vector
+          );
 
-      (void )scheme_apply0(sc, "main");
+      (void)scheme_apply0(sc, "main");
     }
   }
   close(skfd);

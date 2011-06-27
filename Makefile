@@ -7,8 +7,9 @@ MANDIR  = $(PREFIX)/share/man
 CC      = gcc
 
 CFLAGS  = -Wall -ansi -pedantic 
-CFLAGS += -I/usr/local/include/tinyscheme
-CFLAGS += -Wno-long-long
+CFLAGS += -I/usr/local/include/tinyscheme 
+CFLAGS += -Wno-long-long 
+CFLAGS += -DUSE_INTERFACE=1 -DSTANDALONE=1
 
 LFLAGS  = -L/usr/local/lib
 LFLAGS += -fpic -ltinyscheme
