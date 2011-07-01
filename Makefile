@@ -9,7 +9,7 @@ CC      = gcc
 CFLAGS  = -Wall -ansi -pedantic 
 CFLAGS += -I/usr/local/include/tinyscheme 
 CFLAGS += -Wno-long-long 
-CFLAGS += -DUSE_INTERFACE=1 -DSTANDALONE=1
+CFLAGS += -DUSE_INTERFACE=1 -DSTANDALONE=1 -DUSE_MATH=1
 
 LFLAGS  = -L/usr/local/lib
 LFLAGS += -fpic -ltinyscheme

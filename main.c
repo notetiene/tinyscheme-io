@@ -54,7 +54,7 @@ int main (int argc, char *argv[], char *arge[]) {
   if (file == NULL) {
     error();
   }
-  scheme_load_named_file (sc, file, "init.scm") ;
+  scheme_load_named_file (sc, file, "init.scm");
   fclose(file);
 
   file = fopen("fn.scm", "ra");
