@@ -19,6 +19,8 @@
 
 #define BUFFER_SIZE 4096
 
+unsigned verbose = 0;
+
 const char help[] =
 "ioscheme \n"
 "  -p PORT    port number\n"
@@ -45,7 +47,14 @@ int main (int argc, char *argv[], char *arge[]) {
   unsigned udp = 0;
   int optval = 0;
 
-  while ((ch = getopt(argc, argv, "uhp:")) != -1) {
+  unsigned char buffer[BUFFER_SIZE];
+  char output[BUFFER_SIZE];
+
+  openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+
+  sc = scheme_init_new ();
+
+  while ((ch = getopt(argc, argv, "vuhp:")) != -1) {
     switch(ch) {
       case 'p':
         port = atoi(optarg);
@@ -56,6 +65,9 @@ int main (int argc, char *argv[], char *arge[]) {
       case 'h':
         puts(help);
         return(0);
+      case 'v':
+        verbose = 1;
+        break;
       case '?':
         if (optopt == 'p') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
@@ -65,10 +77,6 @@ int main (int argc, char *argv[], char *arge[]) {
         return(1);
     }
   }
-
-  openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
-
-  sc = scheme_init_new ();
 
   scheme_set_input_port_file  (sc, stdin);
   scheme_set_output_port_file (sc, stdout);
@@ -104,11 +112,13 @@ int main (int argc, char *argv[], char *arge[]) {
   addr.sin_addr.s_addr = INADDR_ANY;
   addrlen = sizeof(addr);
 
-  printf("%s:%u %d  %s:%u\n", __FILE__, __LINE__, 
-    skfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-
   if (bind(skfd, (struct sockaddr *)&addr, addrlen) < 0) {
     error();
+  }
+
+  if (verbose) {
+    printf("bound to %s:%u\n", 
+      inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
   }
 
   if (!udp) {
@@ -117,8 +127,10 @@ int main (int argc, char *argv[], char *arge[]) {
     }
   }
 
+  scheme_set_output_port_string(sc, output, output+BUFFER_SIZE);
+  sc->gc_verbose = 0;
+
   for ( ; ; ) {
-    unsigned char buffer[BUFFER_SIZE];
 
     fd_set fds;
     struct sockaddr_in addr2;
@@ -150,18 +162,18 @@ int main (int argc, char *argv[], char *arge[]) {
     }
     buffer[err] = '\0';
     if (err > 0) {
-      char output[BUFFER_SIZE];
-      pointer vector;
       int i;
-
-      scheme_set_output_port_string(sc, output, output+BUFFER_SIZE);
+      pointer vector;
 
       vector = sc->vptr->mk_vector(sc, err);
-      for(i = 0; i < err; i++) {
+
+      for(i = 0; (i < err) && (i < BUFFER_SIZE); i++) {
         sc->vptr->set_vector_elem(vector, i, mk_character(sc, buffer[i]));
       }
-      sc->vptr->scheme_define(sc, sc->global_env, mk_symbol(sc, "data"), vector);
-      (void)scheme_apply0(sc, "main");
+
+      (void)scheme_apply1(sc, "receive", _cons(sc, vector, sc->NIL, 0));
+
+      /*sc->vptr->gc(sc, sc->NIL, sc->NIL);*/
 
       if (skfd2 > 0) {
         err = send(skfd2, output, strlen(output), 0);

@@ -10,7 +10,7 @@
 (define (list->hex l)
   (for-each (lambda (n) (display (number->hex n))) l))
 
-(define (main) 
+(define (receive data) 
   (display
     (string-append ": "
       (list->string 

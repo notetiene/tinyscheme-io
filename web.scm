@@ -1,4 +1,5 @@
 
+
 (define (sexp->html html)
     (cond ((pair? html) (string-append (apply string-append "<" (symbol->string (car html)) ">\n" (map sexp->html (cdr html))) "</" (symbol->string (car html)) ">\n"))
                   ((symbol? html) (string-append (symbol->string html) " "))
@@ -8,8 +9,7 @@
   (display
     (string-append
       "HTTP/1.1 500 Internal Server Error\n"
-      "\n"
-      )))
+      "\n")))
 
 (define (http_response html)
   (string-append 
@@ -24,13 +24,13 @@
    "Content-Type: text/html\n\n"
    html))
 
-(define (main)
+(define (receive data)
   (display
     (http_response
       (sexp->html
         '(html (head (title My page))
            (body
-             (p hello world)))))))
+             (p hello world!)))))))
 
 (display "Loaded web script.") (newline)
 
