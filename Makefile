@@ -37,7 +37,7 @@ $(BIN): $(OBJ)
 	$(CC) $(CFLAGS) -c $< 
 
 clean:
-	rm -f $(OBJ) $(BIN) 
+	rm -f $(OBJ) $(BIN) *.o
 
 test: $(BIN)
 	nc -u 127.0.0.1 8000
