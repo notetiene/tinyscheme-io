@@ -1,4 +1,7 @@
-
+/*
+ *  Copyright (C) 2011  A. Carl Douglas <carl.douglas@gmail.com>
+ */
+/* vim: softtabstop=2 shiftwidth=2 expandtab  */
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -16,8 +19,14 @@
 
 #define BUFFER_SIZE 4096
 
+const char help[] =
+"ioscheme \n"
+"  -p PORT    port number\n"
+"  -u         udp mode\n"
+"  -h         this help\n";
+
 void error() {
-  syslog(LOG_ERR, "%s", strerror(errno));
+  syslog(LOG_ERR, "ERROR: %s", strerror(errno));
   exit(errno);
 }
 
@@ -28,91 +37,148 @@ int main (int argc, char *argv[], char *arge[]) {
   struct sockaddr_in addr;
   unsigned short port = 8000;
 
-  FILE *file;
   scheme *sc;
 
   int ch;
+  int index;
 
-  while ((ch = getopt(argc, argv, "p:")) != -1) {
+  unsigned udp = 0;
+  int optval = 0;
+
+  while ((ch = getopt(argc, argv, "uhp:")) != -1) {
     switch(ch) {
       case 'p':
         port = atoi(optarg);
-        printf("using port %d\n", port);
         break;
+      case 'u':
+        udp = 1;
+        break;
+      case 'h':
+        puts(help);
+        return(0);
+      case '?':
+        if (optopt == 'p') {
+          fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+        } else if (isprint (optopt)) {
+          /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
+        }
+        return(1);
     }
   }
-
 
   openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
 
   sc = scheme_init_new ();
 
-  /*scheme_set_input_port_file  (sc, stdin);*/
+  scheme_set_input_port_file  (sc, stdin);
   scheme_set_output_port_file (sc, stdout);
 
-  file = fopen("init.scm", "ra");
-  if (file == NULL) {
-    error();
+  for (index = optind; index < argc; index++) {
+    FILE *file;
+    file = fopen(argv[index], "ra");
+    if (file == NULL) {
+      error();
+    }
+    scheme_load_named_file (sc, file, argv[index]);
+    fclose(file);
   }
-  scheme_load_named_file (sc, file, "init.scm");
-  fclose(file);
 
-  file = fopen("fn.scm", "ra");
-  if (file == NULL) {
-    error();
+  if (udp) {
+    skfd = socket(PF_INET, SOCK_DGRAM,  IPPROTO_UDP);
+  } else {
+    skfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
   }
-  scheme_load_named_file (sc, file, "fn.scm");
-  fclose(file);
 
-  skfd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (skfd < 0) {
     error();
   }
+
+  optval = 1;
+  if (setsockopt(skfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval) < 0) {
+    error();
+  }
+
   memset(&addr, 0, sizeof addr);
   addr.sin_family      = AF_INET;
   addr.sin_port        = htons(port);
   addr.sin_addr.s_addr = INADDR_ANY;
   addrlen = sizeof(addr);
 
+  printf("%s:%u %d  %s:%u\n", __FILE__, __LINE__, 
+    skfd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+
   if (bind(skfd, (struct sockaddr *)&addr, addrlen) < 0) {
     error();
   }
 
+  if (!udp) {
+    if (listen(skfd, 10) < 0) {
+      error();
+    }
+  }
+
   for ( ; ; ) {
+    unsigned char buffer[BUFFER_SIZE];
+
     fd_set fds;
     struct sockaddr_in addr2;
-    socklen_t addrlen2;
-    unsigned char buffer[BUFFER_SIZE];
+    socklen_t addrlen2 = sizeof addr2;
+
+    int skfd2 = -1;
+
     FD_ZERO(&fds);
     FD_SET(skfd, &fds);
+
     err = select(skfd + 1, &fds, NULL, NULL, NULL);
     if (err < 0) {
       error();
     }
-    err = recvfrom(skfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
+    if (!udp && FD_ISSET(skfd, &fds)) {
+      err = accept(skfd, (struct sockaddr *)&addr2, &addrlen2);
+      if (err < 0) {
+        error();
+      }
+      skfd2 = err;
+    }
+    if (skfd2 != -1) {
+      err = recvfrom(skfd2, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
+    } else {
+      err = recvfrom(skfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
+    }
     if (err < 0) {
       error();
     }
     buffer[err] = '\0';
     if (err > 0) {
+      char output[BUFFER_SIZE];
       pointer vector;
       int i;
+
+      scheme_set_output_port_string(sc, output, output+BUFFER_SIZE);
+
       vector = sc->vptr->mk_vector(sc, err);
       for(i = 0; i < err; i++) {
         sc->vptr->set_vector_elem(vector, i, mk_character(sc, buffer[i]));
       }
-      sc->vptr->scheme_define(sc, sc->global_env, 
-          mk_symbol (sc, "data"),
-          vector
-          );
-
+      sc->vptr->scheme_define(sc, sc->global_env, mk_symbol(sc, "data"), vector);
       (void)scheme_apply0(sc, "main");
+
+      if (skfd2 > 0) {
+        err = send(skfd2, output, strlen(output), 0);
+      } else {
+        err = sendto(skfd, output, strlen(output), 0, (struct sockaddr *)&addr2, addrlen2);
+      }
+      if (err < 0) {
+        error();
+      }
+    }
+
+    if (!udp && skfd2 > 0) {
+      close(skfd2);
     }
   }
   close(skfd);
-
   scheme_deinit(sc);
-
   closelog();
 
   return err;

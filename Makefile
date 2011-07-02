@@ -6,19 +6,24 @@ MANDIR  = $(PREFIX)/share/man
 
 CC      = gcc
 
-CFLAGS  = -Wall -ansi -pedantic 
-CFLAGS += -I/usr/local/include/tinyscheme 
+CFLAGS  =  
+#CFLAGS += -ansi 
 CFLAGS += -Wno-long-long 
-CFLAGS += -DUSE_INTERFACE=1 -DSTANDALONE=1 -DUSE_MATH=1
+CFLAGS += -DUSE_INTERFACE=1 \
+	  -DSTANDALONE=0 \
+	  -DUSE_MATH=1 \
+	  -DOSX=1 \
+          -DUSE_DL=1 \
+	  -DUSE_ERROR_HOOK=1
 
-LFLAGS  = -L/usr/local/lib
-LFLAGS += -fpic -ltinyscheme
+LFLAGS  = 
 
 INC     = 
-SRC     =  main.c
+SRC     =  main.c scheme.c 
+#SRC    += dynload.c
 
 OBJ     = $(SRC:.c=.o)
-BIN     = iodispatch
+BIN     = ioscheme
 LIB     = 
 
 default: all
@@ -26,7 +31,7 @@ default: all
 all:	$(BIN) 
 
 $(BIN): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $< $(LFLAGS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LFLAGS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< 
@@ -44,7 +49,7 @@ install: $(LIB)
 
 install-man:
 	install -d $(DESTDIR)$(MANDIR)/man3
-	install -m 0644 bits.3 $(DESTDIR)$(MANDIR)/man3
+	install -m 0644 ioscheme.3 $(DESTDIR)$(MANDIR)/man3
 
 uninstall:
 	rm -f $(DEST)/lib/$(LIB).a
