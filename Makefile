@@ -6,7 +6,7 @@ MANDIR  = $(PREFIX)/share/man
 
 CC      = gcc
 
-CFLAGS  =  
+CFLAGS  =   -g -ggdb
 #CFLAGS += -ansi 
 CFLAGS += -Wno-long-long 
 CFLAGS += -DUSE_INTERFACE=1 \
