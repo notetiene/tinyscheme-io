@@ -140,6 +140,7 @@ SCHEME_EXPORT void scheme_load_file(scheme *sc, FILE *fin);
 SCHEME_EXPORT void scheme_load_named_file(scheme *sc, FILE *fin, const char *filename);
 SCHEME_EXPORT void scheme_load_string(scheme *sc, const char *cmd);
 SCHEME_EXPORT pointer scheme_apply0(scheme *sc, const char *procname);
+SCHEME_EXPORT pointer scheme_apply1(scheme *sc, const char *procname, pointer args);
 SCHEME_EXPORT pointer scheme_call(scheme *sc, pointer func, pointer args);
 SCHEME_EXPORT pointer scheme_eval(scheme *sc, pointer obj);
 void scheme_set_external_data(scheme *sc, void *p);
@@ -160,7 +161,6 @@ pointer mk_foreign_func(scheme *sc, foreign_func f);
 void putstr(scheme *sc, const char *s);
 int list_length(scheme *sc, pointer a);
 int eqv(pointer a, pointer b);
-
 
 #if USE_INTERFACE
 struct scheme_interface {
@@ -224,6 +224,7 @@ struct scheme_interface {
   void (*setimmutable)(pointer p);
   void (*load_file)(scheme *sc, FILE *fin);
   void (*load_string)(scheme *sc, const char *input);
+  void (*gc)(scheme *sc, pointer a, pointer b);
 };
 #endif
 
