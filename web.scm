@@ -38,7 +38,6 @@
         `(html (head (title My page))
            (body
              (p hello world!)
-             ;(p ,(list->string (vector->list data)))))))))
              (p method: ,(http-method (list->string (vector->list data))))
              (p uri:    ,(http-uri (list->string (vector->list data))))))))))
 
