@@ -1,0 +1,29 @@
+.\" groff -man -Tascii ioscheme.3 | less
+.TH ioscheme 3 
+.SH "NAME"
+ioscheme \- an input event driven scheme interpreter
+.SH "SYNOPSIS"
+.B ioscheme
+.RB [  -vu  ]
+.RB [  -p  \fIPORT\fR  ]
+.RI [  files...  ]
+.PP
+.B ioscheme
+.RB [ -h ]
+.SH "OPTIONS"
+.IP -v
+Verbose mode.
+.IP -u
+UDP mode.
+.IP -h
+Show usage information.
+.IP -p
+.I
+PORT
+Port to listen on.
+.SH DESCRIPTION
+ioscheme listens on a port (udp or tcp) and evaluates a scheme function when data is received on the port.
+.SH "AUTHORS"
+Tinyscheme was written by Atsushi Moriwaki, Akira KIDA, R.C. Secrist, D. Souflis.
+Ioscheme by A. Carl Douglas (carl.douglas@gmail.com).
+
