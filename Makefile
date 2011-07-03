@@ -14,7 +14,8 @@ CFLAGS += -DUSE_INTERFACE=1 \
 	  -DUSE_MATH=1 \
 	  -DOSX=1 \
           -DUSE_DL=1 \
-	  -DUSE_ERROR_HOOK=1
+	  -DUSE_ERROR_HOOK=1 \
+	  -DUSE_ASCII=1
 
 LFLAGS  = 
 

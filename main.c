@@ -24,7 +24,8 @@ unsigned verbose = 0;
 const char help[] =
 "ioscheme \n"
 "  -p PORT    port number\n"
-"  -u         udp mode\n"
+"  -u         udp mode, otherwise tcp\n"
+"  -v         verbose\n"
 "  -h         this help\n";
 
 void error() {
