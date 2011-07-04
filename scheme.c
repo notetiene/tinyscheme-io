@@ -4831,13 +4831,13 @@ pointer scheme_eval(scheme *sc, pointer obj)
 {
   int old_repl = sc->interactive_repl;
   sc->interactive_repl = 0;
-  save_from_C_call(sc);
+/*  save_from_C_call(sc);*/
   sc->args = sc->NIL;
   sc->code = obj;
   sc->retcode = 0;
   Eval_Cycle(sc, OP_EVAL);
   sc->interactive_repl = old_repl;
-  restore_from_C_call(sc);
+/*  restore_from_C_call(sc);*/
   return sc->value;
 }
 
