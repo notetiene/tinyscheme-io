@@ -6,7 +6,7 @@ MANDIR  = $(PREFIX)/share/man
 
 CC      = gcc
 
-CFLAGS  =   -g -ggdb
+CFLAGS  =   -g -ggdb 
 #CFLAGS += -ansi 
 CFLAGS += -Wno-long-long 
 CFLAGS += -DUSE_INTERFACE=1 \
@@ -49,8 +49,8 @@ install: $(LIB)
 	install -v -m 0644 $(INC)   $(DEST)/include
 
 install-man:
-	install -d $(DESTDIR)$(MANDIR)/man3
-	install -m 0644 ioscheme.3 $(DESTDIR)$(MANDIR)/man3
+	install -d $(DESTDIR)$(MANDIR)/man1
+	install -m 0644 ioscheme.1 $(DESTDIR)$(MANDIR)/man1
 
 uninstall:
 	rm -f $(DEST)/lib/$(LIB).a
