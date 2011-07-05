@@ -1,11 +1,12 @@
-.\" groff -man -Tascii ioscheme.3 | less
-.TH ioscheme 3 
+.\" groff -man -Tascii ioscheme.1 | less
+.TH ioscheme 1 
 .SH "NAME"
 ioscheme \- an input event driven scheme interpreter
 .SH "SYNOPSIS"
 .B ioscheme
 .RB [  -vu  ]
 .RB [  -p  \fIPORT\fR  ]
+.RB [  -e  \fIFUNCTION\fR  ]
 .RI [  files...  ]
 .PP
 .B ioscheme
@@ -14,17 +15,24 @@ ioscheme \- an input event driven scheme interpreter
 .IP -v
 Verbose mode.
 .IP -u
-UDP mode.
+Listen on a UDP socket. The default is to listen on a TCP socket.
 .IP -h
 Show usage information.
 .IP -p
 .I
 PORT
-Port to listen on.
+to listen on.
+.IP -e
+.I
+FUNCTION
+scheme entry point. The name of a scheme function 
+that will be called when data is received.
+The data is passed to the function as the single argument.
 .SH DESCRIPTION
-ioscheme listens on a port (udp or tcp) and evaluates a scheme function when data is received on the port.
+ioscheme listens on a port (udp or tcp) and evaluates a 
+scheme function when data is received.
 .SH EXAMPLE
-ioscheme -v -p8000 init.scm string.scm web.scm
+ioscheme -v -p 8000 -e receive init.scm string.scm web.scm
 .SH "AUTHORS"
 Tinyscheme was written by Atsushi Moriwaki, Akira KIDA, R.C. Secrist, D. Souflis.
 Ioscheme by A. Carl Douglas (carl.douglas@gmail.com).
