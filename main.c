@@ -1,7 +1,11 @@
 /*
+ *  ioscheme - an input event driven scheme interpreter
+ *
  *  Copyright (C) 2011  A. Carl Douglas <carl.douglas@gmail.com>
+ *
  */
 /* vim: softtabstop=2 shiftwidth=2 expandtab  */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
@@ -19,49 +23,52 @@
 
 #define BUFFER_SIZE 4096
 
-unsigned verbose = 0;
+static unsigned verbose = 0;
 
-const char help[] =
+static const char help[] =
 "ioscheme \n"
-"  -p PORT    port number\n"
-"  -u         udp mode, otherwise tcp\n"
-"  -v         verbose\n"
-"  -h         this help\n";
+"  -e FUNCTION scheme entry point\n"
+"  -p PORT     port number\n"
+"  -u          udp mode, otherwise tcp\n"
+"  -v          verbose\n"
+"  -h          this help\n";
 
-void error() {
+static void error() {
   syslog(LOG_ERR, "ERROR: %s", strerror(errno));
   exit(errno);
 }
 
-int main (int argc, char *argv[], char *arge[]) {
+int main (int argc, char *argv[]) {
+
+  enum { TCP, UDP } socket_type = TCP;
 
   int skfd = -1, err = 0;
   socklen_t addrlen = 0;
   struct sockaddr_in addr;
   unsigned short port = 8000;
 
-  scheme *sc;
+  scheme *sc = NULL;
 
   int ch;
   int index;
 
-  unsigned udp = 0;
   int optval = 0;
 
   unsigned char buffer[BUFFER_SIZE];
   char output[BUFFER_SIZE];
 
-  openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+  const char *entry_point = "receive";
 
-  sc = scheme_init_new ();
-
-  while ((ch = getopt(argc, argv, "vuhp:")) != -1) {
+  while ((ch = getopt(argc, argv, "vuhp:e:")) != -1) {
     switch(ch) {
+      case 'e':
+        entry_point = optarg;
+        break;
       case 'p':
-        port = atoi(optarg);
+        port = (unsigned short) atoi(optarg);
         break;
       case 'u':
-        udp = 1;
+        socket_type = UDP;
         break;
       case 'h':
         puts(help);
@@ -79,11 +86,15 @@ int main (int argc, char *argv[], char *arge[]) {
     }
   }
 
+  openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+
+  sc = scheme_init_new ();
+
   scheme_set_input_port_file  (sc, stdin);
   scheme_set_output_port_file (sc, stdout);
 
   for (index = optind; index < argc; index++) {
-    FILE *file;
+    FILE *file = NULL;
     file = fopen(argv[index], "ra");
     if (file == NULL) {
       error();
@@ -92,10 +103,10 @@ int main (int argc, char *argv[], char *arge[]) {
     fclose(file);
   }
 
-  if (udp) {
-    skfd = socket(PF_INET, SOCK_DGRAM,  IPPROTO_UDP);
-  } else {
+  if (socket_type == TCP) {
     skfd = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
+  } else {
+    skfd = socket(PF_INET, SOCK_DGRAM,  IPPROTO_UDP);
   }
 
   if (skfd < 0) {
@@ -103,7 +114,7 @@ int main (int argc, char *argv[], char *arge[]) {
   }
 
   optval = 1;
-  if (setsockopt(skfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof optval) < 0) {
+  if (setsockopt(skfd, SOL_SOCKET, SO_REUSEADDR, &optval, (socklen_t)sizeof optval) < 0) {
     error();
   }
 
@@ -122,16 +133,16 @@ int main (int argc, char *argv[], char *arge[]) {
       inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
   }
 
-  if (!udp) {
+  if (socket_type == TCP) {
     if (listen(skfd, 10) < 0) {
       error();
     }
   }
 
   scheme_set_output_port_string(sc, output, output+BUFFER_SIZE);
-  sc->gc_verbose = 0;
+  sc->gc_verbose = (char)0;
 
-  for ( ; ; ) {
+  for (;;) {
 
     fd_set fds;
     struct sockaddr_in addr2;
@@ -141,19 +152,19 @@ int main (int argc, char *argv[], char *arge[]) {
 
     FD_ZERO(&fds);
     FD_SET(skfd, &fds);
-
+  
     err = select(skfd + 1, &fds, NULL, NULL, NULL);
     if (err < 0) {
       error();
     }
-    if (!udp && FD_ISSET(skfd, &fds)) {
+    if (socket_type == TCP && FD_ISSET(skfd, &fds)) {
       err = accept(skfd, (struct sockaddr *)&addr2, &addrlen2);
       if (err < 0) {
         error();
       }
       skfd2 = err;
     }
-    if (skfd2 != -1) {
+    if (socket_type == TCP) {
       err = recvfrom(skfd2, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
     } else {
       err = recvfrom(skfd, buffer, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
@@ -161,7 +172,6 @@ int main (int argc, char *argv[], char *arge[]) {
     if (err < 0) {
       error();
     }
-    buffer[err] = '\0';
     if (err > 0) {
       int i;
       pointer vector;
@@ -172,11 +182,9 @@ int main (int argc, char *argv[], char *arge[]) {
         sc->vptr->set_vector_elem(vector, i, mk_character(sc, buffer[i]));
       }
 
-      (void)scheme_apply1(sc, "receive", _cons(sc, vector, sc->NIL, 0));
+      scheme_apply1(sc, entry_point, _cons(sc, vector, sc->NIL, 0));
 
-      /*sc->vptr->gc(sc, sc->NIL, sc->NIL);*/
-
-      if (skfd2 > 0) {
+      if (socket_type == TCP && skfd2 > 0) {
         err = send(skfd2, output, strlen(output), 0);
       } else {
         err = sendto(skfd, output, strlen(output), 0, (struct sockaddr *)&addr2, addrlen2);
@@ -186,7 +194,7 @@ int main (int argc, char *argv[], char *arge[]) {
       }
     }
 
-    if (!udp && skfd2 > 0) {
+    if (socket_type == TCP && skfd2 > 0) {
       close(skfd2);
     }
   }
