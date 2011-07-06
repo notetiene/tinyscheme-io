@@ -9,6 +9,7 @@ CC      = gcc
 CFLAGS  =   -g -ggdb 
 #CFLAGS += -ansi 
 CFLAGS += -Wno-long-long 
+CFLAGS += -I/opt/local/include
 CFLAGS += -DUSE_INTERFACE=1 \
 	  -DSTANDALONE=0 \
 	  -DUSE_MATH=1 \
@@ -17,7 +18,7 @@ CFLAGS += -DUSE_INTERFACE=1 \
 	  -DUSE_ERROR_HOOK=1 \
 	  -DUSE_ASCII=1
 
-LFLAGS  = 
+LFLAGS  =  -L/opt/local/lib -levent -levent_extra
 
 INC     = 
 SRC     =  main.c scheme.c 
@@ -25,7 +26,7 @@ SRC     =  main.c scheme.c
 
 OBJ     = $(SRC:.c=.o)
 BIN     = ioscheme
-LIB     = 
+LIB     =  
 
 default: all
 
