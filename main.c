@@ -77,7 +77,7 @@ int main (int argc, char *argv[]) {
         verbose = 1;
         break;
       case '?':
-        if (optopt == 'p') {
+        if (optopt == 'p' || optopt == 'e') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
         } else if (isprint (optopt)) {
           /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
@@ -86,7 +86,7 @@ int main (int argc, char *argv[]) {
     }
   }
 
-  openlog("iodispatch", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+  openlog("ioscheme", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
 
   sc = scheme_init_new ();
 
