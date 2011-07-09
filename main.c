@@ -59,6 +59,8 @@ send_document_cb(struct evhttp_request *req, void *arg)
   char *decoded_path;
   char *whole_path = NULL;
 
+  struct evkeyvalq *hdrs;
+
   pointer sc_method;
   pointer sc_path;
   pointer sc_return;
@@ -75,12 +77,15 @@ send_document_cb(struct evhttp_request *req, void *arg)
 
   sc_path = mk_string(sc, path);
 
+  sc_path = mk_string(sc, path);
   sc_return = scheme_apply1(sc, entry_point, _cons(sc, sc_method, _cons(sc, sc_path, sc->NIL, 0), 0));
 
   evb = evbuffer_new();
   evbuffer_add_printf(evb, "%s", sc->vptr->string_value(sc_return));
-  evhttp_add_header(evhttp_request_get_output_headers(req),
-                          "Content-Type", "text/html");
+  hdrs = evhttp_request_get_output_headers(req);
+  evhttp_add_header(hdrs, "Server", "ioscheme");
+  evhttp_add_header(hdrs, "Content-Type", "text/html");
+  evhttp_add_header(hdrs, "Connection", "close");
   evhttp_send_reply(req, 200, "OK", evb);
   if (decoded)
     evhttp_uri_free(decoded);
@@ -129,7 +134,7 @@ int main (int argc, char *argv[]) {
 
   base = event_base_new();
   if (!base) {
-    fprintf(stderr, "Couldn't create an event_base: exiting\n");
+    syslog(LOG_ERR, "Couldn't create an event_base: exiting\n");
     return 1;
   }
   http = evhttp_new(base);
