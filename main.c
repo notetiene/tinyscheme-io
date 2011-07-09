@@ -97,6 +97,15 @@ send_document_cb(struct evhttp_request *req, void *arg)
     evbuffer_free(evb);
 }
 
+static void
+signal_cb(evutil_socket_t sig, short events, void *user_data)
+{
+  struct event_base *base = user_data;
+  struct timeval delay = { 0, 0 };
+  syslog(LOG_ERR, "Caught signal; exiting");
+  event_base_loopexit(base, &delay);
+}
+
 int main (int argc, char *argv[]) {
 
   int ch;
@@ -105,6 +114,7 @@ int main (int argc, char *argv[]) {
   struct event_base *base;
   struct evhttp *http;
   struct evhttp_bound_socket *handle;
+  struct event *signal_event;
 
   while ((ch = getopt(argc, argv, "vuhp:e:")) != -1) {
     switch(ch) {
@@ -137,6 +147,13 @@ int main (int argc, char *argv[]) {
     syslog(LOG_ERR, "Couldn't create an event_base: exiting\n");
     return 1;
   }
+
+  signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
+  if (!signal_event || event_add(signal_event, NULL)<0) {
+    syslog(LOG_ERR, "Could not create/add a signal event!\n");
+    return 1;
+  }
+
   http = evhttp_new(base);
   evhttp_set_gencb(http, send_document_cb, argv[1]);
 
