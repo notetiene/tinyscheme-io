@@ -6,7 +6,7 @@ MANDIR  = $(PREFIX)/share/man
 
 CC      = gcc
 
-CFLAGS  =   -g -ggdb 
+CFLAGS  =   -g -ggdb -pg
 #CFLAGS += -ansi 
 CFLAGS += -Wno-long-long 
 CFLAGS += -I/opt/local/include
