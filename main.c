@@ -40,7 +40,8 @@ static const char help[] =
 "ioscheme \n"
 "  -e FUNCTION scheme entry point\n"
 "  -p PORT     port number\n"
-/*"  -u          udp mode, otherwise tcp\n"*/
+"  -u          udp mode, otherwise http\n"
+"  -t          tcp mode, otherwise http\n"
 "  -v          verbose\n"
 "  -h          this help\n";
 
@@ -87,6 +88,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
   evhttp_add_header(hdrs, "Content-Type", "text/html");
   evhttp_add_header(hdrs, "Connection", "close");
   evhttp_send_reply(req, 200, "OK", evb);
+
   if (decoded)
     evhttp_uri_free(decoded);
   if (decoded_path)
@@ -95,6 +97,58 @@ send_document_cb(struct evhttp_request *req, void *arg)
     free(whole_path);
   if (evb)
     evbuffer_free(evb);
+}
+
+#if 0
+static void conn_writecb(struct bufferevent *bev, void *user_data)
+{
+
+}
+
+static void conn_readcb(struct bufferevent *bev, void *user_data)
+{
+
+}
+
+static void conn_eventcb(struct bufferevent *bev, short events, void *user_data){
+
+}
+
+static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
+        struct sockaddr *sa, int socklen, void *user_data)
+{
+  struct event_base *base = user_data;
+  struct bufferevent *bev;
+  bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
+  bufferevent_setcb(bev, conn_readcb, conn_writecb, conn_eventcb, NULL);
+  bufferevent_enable(bev, EV_WRITE);
+  bufferevent_disable(bev, EV_READ);
+bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+}
+#endif
+
+
+static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
+{
+  if ((events & EV_READ) == EV_READ) {
+    char bytes[4096];
+    int err;
+    struct sockaddr_in addr2;
+    socklen_t addrlen2 = sizeof addr2;
+
+    pointer sc_return;
+    pointer vector;
+
+    err = recvfrom(fd, bytes, 4096, 0, (struct sockaddr *)&addr2, &addrlen2); 
+    if (err > 0) {
+      int i;
+      vector = sc->vptr->mk_vector(sc, err);
+      for(i = 0; (i < err) && (i < 4096); i++) {
+        sc->vptr->set_vector_elem(vector, i, mk_character(sc, bytes[i]));
+      }
+      sc_return = scheme_apply1(sc, entry_point, _cons(sc, vector, sc->NIL, 0));
+    }
+  }
 }
 
 static void
@@ -106,7 +160,15 @@ signal_cb(evutil_socket_t sig, short events, void *user_data)
   event_base_loopexit(base, &delay);
 }
 
+static void
+event_logger(int sev, const char *msg) {
+  int p = (sev == _EVENT_LOG_ERR) ? LOG_ERR : LOG_DEBUG;
+  syslog(p, msg);
+}
+
 int main (int argc, char *argv[]) {
+
+  enum { HTTP, TCP, UDP } server_type = HTTP;
 
   int ch;
   int index;
@@ -115,8 +177,9 @@ int main (int argc, char *argv[]) {
   struct evhttp *http;
   struct evhttp_bound_socket *handle;
   struct event *signal_event;
+  struct event *socket_event;
 
-  while ((ch = getopt(argc, argv, "vuhp:e:")) != -1) {
+  while ((ch = getopt(argc, argv, "vuthp:e:")) != -1) {
     switch(ch) {
       case 'e':
         entry_point = optarg;
@@ -127,6 +190,13 @@ int main (int argc, char *argv[]) {
       case 'h':
         puts(help);
         return(0);
+      case 'u':
+        server_type = UDP; 
+        break;
+      case 't':
+        exit(-1); /* not implemented */
+        server_type = TCP; 
+        break;
       case 'v':
         verbose = 1;
         break;
@@ -142,26 +212,12 @@ int main (int argc, char *argv[]) {
 
   openlog("ioscheme", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
 
-  base = event_base_new();
-  if (!base) {
-    syslog(LOG_ERR, "Couldn't create an event_base: exiting\n");
-    return 1;
-  }
-
-  signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
-  if (!signal_event || event_add(signal_event, NULL)<0) {
-    syslog(LOG_ERR, "Could not create/add a signal event!\n");
-    return 1;
-  }
-
-  http = evhttp_new(base);
-  evhttp_set_gencb(http, send_document_cb, argv[1]);
-
   sc = scheme_init_new ();
 
   scheme_set_input_port_file  (sc, stdin);
   scheme_set_output_port_file (sc, stdout);
 
+  /* load all the other arguments as files into scheme */
   for (index = optind; index < argc; index++) {
     FILE *file = NULL;
     file = fopen(argv[index], "ra");
@@ -172,19 +228,67 @@ int main (int argc, char *argv[]) {
     fclose(file);
   }
 
-  handle = evhttp_bind_socket_with_handle(http, "0.0.0.0", iport);
-  if (!handle) {
-    error();
+  if (verbose) {
+    syslog(LOG_INFO, "libevent %s ", event_get_version());
+  }
+  event_set_log_callback(event_logger);
+
+  base = event_base_new();
+  if (!base) {
+    syslog(LOG_ERR, "Couldn't create an event_base: exiting\n");
+    return 1;
+  }
+  if (verbose) {
+    syslog(LOG_INFO, "libevent base using %s", event_base_get_method(base));
+  }
+  signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
+  if (!signal_event || event_add(signal_event, NULL)<0) {
+    syslog(LOG_ERR, "Could not create/add a signal event!\n");
+    return 1;
   }
 
+  if (server_type == HTTP) {
+    http = evhttp_new(base);
+    evhttp_set_gencb(http, send_document_cb, NULL);
+    handle = evhttp_bind_socket_with_handle(http, "0.0.0.0", iport);
+    if (!handle) {
+      error();
+    }
+  } else if (server_type == TCP) {
+#if 0
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(port);
+    listener = evconnlistener_new_bind(base, tcp_listener_cb, (void *)base,
+         LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
+         (struct sockaddr*)&sin,
+         sizeof(sin));
+#endif
+  } else if (server_type == UDP) {
+    evutil_socket_t sock;
+    struct sockaddr_in sin;
+    sock = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    memset(&sin, 0, sizeof(sin));
+    sin.sin_family = AF_INET;
+    sin.sin_port   = htons(iport);
+    sin.sin_addr.s_addr = INADDR_ANY;
+    if (bind(sock, (struct sockaddr*)&sin, sizeof(sin))<0) {
+      error();
+    }
+    socket_event = event_new(base, sock, EV_READ|EV_PERSIST, udp_event_cb, sc);
+    if (socket_event == NULL) {
+      error();
+    }
+    event_add(socket_event, NULL);
+    if (verbose) {
+      syslog(LOG_INFO, "bound to %s:%u", 
+       inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+    }
+  }
   event_base_dispatch(base);
-
   scheme_deinit(sc);
   closelog();
-
   return 0;
 }
 
-
 /* EOF */
-
