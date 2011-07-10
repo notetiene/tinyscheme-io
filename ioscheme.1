@@ -4,7 +4,7 @@
 ioscheme \- an input event driven scheme interpreter
 .SH "SYNOPSIS"
 .B ioscheme
-.RB [  -vu  ]
+.RB [  -vut  ]
 .RB [  -p  \fIPORT\fR  ]
 .RB [  -e  \fIFUNCTION\fR  ]
 .RI [  files...  ]
@@ -15,7 +15,9 @@ ioscheme \- an input event driven scheme interpreter
 .IP -v
 Verbose mode.
 .IP -u
-Listen on a UDP socket. The default is to listen on a TCP socket.
+Listen on a UDP socket. The default is a basic HTTP server.
+.IP -t
+Listen on a plain TCP socket. The default is a basic HTTP server.
 .IP -h
 Show usage information.
 .IP -p

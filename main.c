@@ -21,6 +21,8 @@
 #include <event2/event.h>
 #include <event2/http.h>
 #include <event2/buffer.h>
+#include <event2/bufferevent.h>
+#include <event2/listener.h>
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
 
@@ -101,33 +103,53 @@ send_document_cb(struct evhttp_request *req, void *arg)
     evbuffer_free(evb);
 }
 
-#if 0
-static void conn_writecb(struct bufferevent *bev, void *user_data)
-{
-
-}
-
 static void conn_readcb(struct bufferevent *bev, void *user_data)
 {
+  struct evbuffer *src, *dst;
+  size_t len;
+  int i;
+  char *bytes;
 
+  pointer sc_return;
+  pointer vector;
+
+  syslog(LOG_INFO, "%s:%d read callback", __FILE__, __LINE__);
+
+  src = bufferevent_get_input(bev);
+  evbuffer_lock(src);
+  len = evbuffer_get_length(src);
+
+  bytes = evbuffer_pullup(src, -1);
+
+  vector = sc->vptr->mk_vector(sc, len);
+  for(i = 0; (i < len) && (i < BUFFER_SIZE); i++) {
+    sc->vptr->set_vector_elem(vector, i, mk_character(sc, bytes[i]));
+  }
+  evbuffer_unlock(src);
+  sc_return = scheme_apply1(sc, entry_point, _cons(sc, vector, sc->NIL, 0));
 }
 
 static void conn_eventcb(struct bufferevent *bev, short events, void *user_data){
-
+  if (events & (BEV_EVENT_EOF|BEV_EVENT_ERROR)) {
+    if (events & (BEV_EVENT_ERROR)) {
+      syslog(LOG_INFO, "%s:%d error", __FILE__, __LINE__);
+    }
+    bufferevent_free(bev);
+  }
 }
 
-static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd,
+static void accept_cb(struct evconnlistener *listener, evutil_socket_t fd,
         struct sockaddr *sa, int socklen, void *user_data)
 {
   struct event_base *base = user_data;
-  struct bufferevent *bev;
-  bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
-  bufferevent_setcb(bev, conn_readcb, conn_writecb, conn_eventcb, NULL);
-  bufferevent_enable(bev, EV_WRITE);
-  bufferevent_disable(bev, EV_READ);
-bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
+  struct bufferevent *bev_in;
+  struct evbuffer *evb = NULL;
+
+  bev_in = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_DEFER_CALLBACKS);
+
+  bufferevent_setcb(bev_in, conn_readcb, NULL, conn_eventcb, NULL);
+  bufferevent_enable(bev_in, EV_READ|EV_WRITE);
 }
-#endif
 
 
 static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
@@ -180,6 +202,7 @@ int main (int argc, char *argv[]) {
   struct evhttp_bound_socket *handle;
   struct event *signal_event;
   struct event *socket_event;
+  struct evconnlistener * listener;
 
   while ((ch = getopt(argc, argv, "dvuthp:e:")) != -1) {
     switch(ch) {
@@ -262,15 +285,17 @@ int main (int argc, char *argv[]) {
       error();
     }
   } else if (server_type == TCP) {
-#if 0
+    struct sockaddr_in sin;
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
-    sin.sin_port = htons(port);
-    listener = evconnlistener_new_bind(base, tcp_listener_cb, (void *)base,
+    sin.sin_port = htons(iport);
+    listener = evconnlistener_new_bind(base, accept_cb, (void *)base,
          LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE, -1,
          (struct sockaddr*)&sin,
          sizeof(sin));
-#endif
+    if (listener == NULL) {
+      error();
+    }
   } else if (server_type == UDP) {
     evutil_socket_t sock;
     struct sockaddr_in sin;
