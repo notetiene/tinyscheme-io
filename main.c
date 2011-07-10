@@ -113,8 +113,6 @@ static void conn_readcb(struct bufferevent *bev, void *user_data)
   pointer sc_return;
   pointer vector;
 
-  syslog(LOG_INFO, "%s:%d read callback", __FILE__, __LINE__);
-
   src = bufferevent_get_input(bev);
   evbuffer_lock(src);
   len = evbuffer_get_length(src);
@@ -127,6 +125,15 @@ static void conn_readcb(struct bufferevent *bev, void *user_data)
   }
   evbuffer_unlock(src);
   sc_return = scheme_apply1(sc, entry_point, _cons(sc, vector, sc->NIL, 0));
+
+  if (sc_return != sc->NIL) {
+    dst = evbuffer_new();
+    evbuffer_add_printf(dst, "%s", sc->vptr->string_value(sc_return));
+    len = bufferevent_write_buffer(bev, dst);
+    if (len < 0) {
+      syslog(LOG_ERR, "%s:%d error");
+    }
+  }
 }
 
 static void conn_eventcb(struct bufferevent *bev, short events, void *user_data){
