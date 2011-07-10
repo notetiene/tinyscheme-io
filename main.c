@@ -31,6 +31,7 @@
 #define BUFFER_SIZE 4096
 
 static unsigned verbose = 0;
+static unsigned is_daemon = 0;
 
 static unsigned short iport = 8000;
 static scheme *sc = NULL;
@@ -38,6 +39,7 @@ static const char *entry_point = "receive";
 
 static const char help[] =
 "ioscheme \n"
+"  -d          run in the background\n"
 "  -e FUNCTION scheme entry point\n"
 "  -p PORT     port number\n"
 "  -u          udp mode, otherwise http\n"
@@ -179,8 +181,11 @@ int main (int argc, char *argv[]) {
   struct event *signal_event;
   struct event *socket_event;
 
-  while ((ch = getopt(argc, argv, "vuthp:e:")) != -1) {
+  while ((ch = getopt(argc, argv, "dvuthp:e:")) != -1) {
     switch(ch) {
+      case 'd':
+        is_daemon = 1;
+        break;
       case 'e':
         entry_point = optarg;
         break;
@@ -210,6 +215,10 @@ int main (int argc, char *argv[]) {
   }
 
   openlog("ioscheme", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+
+  if (is_daemon) {
+    daemon(0,0);
+  }
 
   sc = scheme_init_new ();
 
