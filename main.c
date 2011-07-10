@@ -131,7 +131,7 @@ bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
 static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
 {
   if ((events & EV_READ) == EV_READ) {
-    char bytes[4096];
+    char bytes[BUFFER_SIZE];
     int err;
     struct sockaddr_in addr2;
     socklen_t addrlen2 = sizeof addr2;
@@ -139,11 +139,11 @@ static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
     pointer sc_return;
     pointer vector;
 
-    err = recvfrom(fd, bytes, 4096, 0, (struct sockaddr *)&addr2, &addrlen2); 
+    err = recvfrom(fd, bytes, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2); 
     if (err > 0) {
       int i;
       vector = sc->vptr->mk_vector(sc, err);
-      for(i = 0; (i < err) && (i < 4096); i++) {
+      for(i = 0; (i < err) && (i < BUFFER_SIZE); i++) {
         sc->vptr->set_vector_elem(vector, i, mk_character(sc, bytes[i]));
       }
       sc_return = scheme_apply1(sc, entry_point, _cons(sc, vector, sc->NIL, 0));
@@ -194,7 +194,6 @@ int main (int argc, char *argv[]) {
         server_type = UDP; 
         break;
       case 't':
-        exit(-1); /* not implemented */
         server_type = TCP; 
         break;
       case 'v':
@@ -228,19 +227,18 @@ int main (int argc, char *argv[]) {
     fclose(file);
   }
 
-  if (verbose) {
-    syslog(LOG_INFO, "libevent %s ", event_get_version());
-  }
-  event_set_log_callback(event_logger);
-
   base = event_base_new();
   if (!base) {
     syslog(LOG_ERR, "Couldn't create an event_base: exiting\n");
     return 1;
   }
+  event_set_log_callback(event_logger);
+
   if (verbose) {
+    syslog(LOG_INFO, "libevent %s ", event_get_version());
     syslog(LOG_INFO, "libevent base using %s", event_base_get_method(base));
   }
+
   signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
   if (!signal_event || event_add(signal_event, NULL)<0) {
     syslog(LOG_ERR, "Could not create/add a signal event!\n");
