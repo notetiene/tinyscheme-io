@@ -30,6 +30,8 @@
 /*#include "scheme.h"*/
 #include "scheme-private.h"
 
+extern void init_scheme_sqlite3(scheme *);
+
 #define BUFFER_SIZE 4096
 
 static unsigned verbose = 0;
@@ -54,7 +56,7 @@ static void error() {
   exit(errno);
 }
 
-static void 
+static void
 send_document_cb(struct evhttp_request *req, void *arg)
 {
   struct evbuffer *evb = NULL;
@@ -170,7 +172,7 @@ static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
     pointer sc_return;
     pointer vector;
 
-    err = recvfrom(fd, bytes, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2); 
+    err = recvfrom(fd, bytes, BUFFER_SIZE, 0, (struct sockaddr *)&addr2, &addrlen2);
     if (err > 0) {
       int i;
       vector = sc->vptr->mk_vector(sc, err);
@@ -196,6 +198,8 @@ event_logger(int sev, const char *msg) {
   int p = (sev == _EVENT_LOG_ERR) ? LOG_ERR : LOG_DEBUG;
   syslog(p, msg);
 }
+
+
 
 int main (int argc, char *argv[]) {
 
@@ -226,10 +230,10 @@ int main (int argc, char *argv[]) {
         puts(help);
         return(0);
       case 'u':
-        server_type = UDP; 
+        server_type = UDP;
         break;
       case 't':
-        server_type = TCP; 
+        server_type = TCP;
         break;
       case 'v':
         verbose = 1;
@@ -254,6 +258,9 @@ int main (int argc, char *argv[]) {
 
   scheme_set_input_port_file  (sc, stdin);
   scheme_set_output_port_file (sc, stdout);
+
+  /* register sqlite3 ffi with scheme environment */
+  init_scheme_sqlite3(sc);
 
   /* load all the other arguments as files into scheme */
   for (index = optind; index < argc; index++) {
@@ -320,7 +327,7 @@ int main (int argc, char *argv[]) {
     }
     event_add(socket_event, NULL);
     if (verbose) {
-      syslog(LOG_INFO, "bound to %s:%u", 
+      syslog(LOG_INFO, "bound to %s:%u",
        inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
     }
   }
