@@ -1,20 +1,12 @@
 
-
-(define (sexp->html html)
-  (cond ((pair? html)
-           (string-append 
-             (apply string-append 
-                    "<" (symbol->string (car html)) ">\n" 
-                      (map sexp->html (cdr html)))
-                    "</" (symbol->string (car html)) ">\n"))
-        ((symbol? html) (string-append (symbol->string html) " "))
-        (#t html)))
-
+(load "html.scm")
 
 (define (receive method path)
   (sexp->html
     `(html 
-       (head (title My page))
+       (head 
+         (style @ ((type "text/css")))
+         (title My page))
          (body
            (p hello world!)
            (p method: ,method)
