@@ -11,8 +11,10 @@
         (display (sqlite-error))))
       (newline)))
 
-(run-query "create table test ( col1 integer );")
-(run-query "select distinct sqlite_version() from sqlite_master;")
+(run-query "select sqlite_version()")
+(run-query "create table hello ( mycolumn text )")
+(run-query "insert into hello (mycolumn) values ('test1')")
+(run-query "select * from hello")
 
 (define (receive method path)
   (sexp->html

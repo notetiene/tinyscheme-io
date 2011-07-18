@@ -39,8 +39,25 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
   int cols;
   pointer sc_row;
   pointer sc_results;
-  int num_rows;
+  int num_rows = 0;
   int row_index = 0;
+  pointer *rows;
+  int i = 0;
+  int page_size = 0;
+  int max_rows = 65535;
+  int rows_per_page;
+
+  page_size = sysconf(_SC_PAGESIZE); /*getpagesize();*/
+  rows_per_page = page_size / sizeof ( pointer );
+
+#if 0
+  printf("rows per page: %d\n", rows_per_page);
+  printf("page_size: %d\n", page_size);
+  printf("num of pages: %d\n", (int)(1 + (max_rows * sizeof(pointer) / page_size)) );
+  printf("allocating: %d\n", (int) (1 + (max_rows * sizeof(pointer) / page_size)) * page_size );
+#endif
+
+  rows = valloc( (1 + (max_rows * sizeof(pointer) / page_size) * page_size ));
 
   arg1 = sp->vptr->pair_car(args);
   if (!sp->vptr->is_string(arg1))
@@ -52,14 +69,15 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
   if (err == SQLITE_ERROR) {
     return sp->F;
   }
-  num_rows = 32; /* todo, resize vector as necessary */
   sc_results = sp->vptr->mk_vector(sp, num_rows);
   while((SQLITE_ROW == (err = sqlite3_step(pst)))) {
+    if (num_rows > max_rows) 
+      break;
     cols = sqlite3_data_count(pst);
     if (cols > 0) {
       int i;
       sc_row = sp->NIL;
-      printf("%d columns\n", cols);
+
       for(i=(cols-1); i>=0; i--) {
         pointer sc_field;
         const char *field;
@@ -72,17 +90,23 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
         }
         */
         field = sqlite3_column_text(pst, i);
-        printf("field: %s\n", field);
         sc_field = sp->vptr->mk_string(sp, field);
         sc_row   = sp->vptr->cons(sp, sc_field, sc_row);
         /*v = sqlite3_column_value(pst, i);*/
       }
-      sp->vptr->set_vector_elem(sc_results, row_index, sc_row);
-      row_index++;
+      rows[num_rows] = sc_row;
+      num_rows++;
     } else {
       printf("no columns?!\n");
     }
   }
+
+  sc_results = sp->vptr->mk_vector(sp, num_rows);
+  for(i = 0 ; i < num_rows ; i++) {
+    sp->vptr->set_vector_elem(sc_results, row_index, rows[i]);
+  }
+
+  free(rows);
   /*printf("sqlite err: %s\n", sqlite3_errmsg(db));*/
   err = sqlite3_finalize(pst);
 
