@@ -1,5 +1,6 @@
 
 (load "html.scm")
+(load "sql.scm")
 
 (sqlite-open ":memory:")
 
