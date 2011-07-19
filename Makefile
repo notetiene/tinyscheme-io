@@ -1,5 +1,7 @@
 # vim: tabstop=8 noexpandtab
 
+VERSION := `date +%Y%m%d`
+
 DESTDIR =
 PREFIX  = /usr/local
 MANDIR  = $(PREFIX)/share/man
@@ -14,7 +16,7 @@ CFLAGS += -DUSE_INTERFACE=1 \
 	  -DSTANDALONE=0 \
 	  -DUSE_MATH=1 \
 	  -DOSX=1 \
-    -DUSE_DL=1 \
+	  -DUSE_DL=1 \
 	  -DUSE_ERROR_HOOK=1 \
 	  -DUSE_ASCII=1
 
@@ -45,17 +47,18 @@ test: $(BIN)
 	nc -u 127.0.0.1 8000
 	#@[ $$? = 0 ] && echo "PASSED OK."
 
-install: $(LIB)
-	install -v -m 0644 $(LIB).a $(DEST)/lib
-	install -v -m 0644 $(INC)   $(DEST)/include
+install: $(BIN)
+	install -v $(BIN) $(DEST)/bin
 
 install-man:
 	install -d $(DESTDIR)$(MANDIR)/man1
 	install -m 0644 ioscheme.1 $(DESTDIR)$(MANDIR)/man1
 
 uninstall:
-	rm -f $(DEST)/lib/$(LIB).a
-	rm -f $(DEST)/include/$(INC)
+	rm -f $(DEST)/bin/$(BIN)
 
-.PHONY: default clean test all install install-man uninstall
+archive:
+	git archive --prefix=$(BIN)-$(VERSION)/ HEAD | gzip > $(BIN)-$(VERSION).tar.gz
+
+.PHONY: default clean test all install install-man uninstall archive
 
