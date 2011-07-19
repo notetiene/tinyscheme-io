@@ -46,6 +46,7 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
   int page_size = 0;
   int max_rows = 65535;
   int rows_per_page;
+  int changes;
 
   page_size = sysconf(_SC_PAGESIZE); /*getpagesize();*/
   rows_per_page = page_size / sizeof ( pointer );
@@ -100,10 +101,16 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
       printf("no columns?!\n");
     }
   }
-
-  sc_results = sp->vptr->mk_vector(sp, num_rows);
-  for(i = 0 ; i < num_rows ; i++) {
-    sp->vptr->set_vector_elem(sc_results, row_index, rows[i]);
+  changes = sqlite3_changes(db);
+  if (num_rows == 0) {
+    char out[64];
+    sprintf(out, "%d rows affected.", changes);
+    sc_results = sp->vptr->mk_string(sp, out);
+  } else {
+    sc_results = sp->vptr->mk_vector(sp, num_rows);
+    for(i = 0 ; i < num_rows ; i++) {
+      sp->vptr->set_vector_elem(sc_results, row_index, rows[i]);
+    }
   }
 
   free(rows);
