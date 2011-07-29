@@ -54,12 +54,12 @@ static const char help[] =
 "  -c            change to document root directory\n"
 "  -d            run in the background\n"
 "  -e FUNCTION   scheme entry point\n"
+"  -h            this help\n"
 "  -p PORT       port number\n"
-"  -r DIRECTORY  the document root directory for serving static files from\n"
-"  -u            udp mode, otherwise http\n"
+"  -r DIRECTORY  the document root directory for serving regular files from\n"
 "  -t            tcp mode, otherwise http\n"
-"  -v            verbose\n"
-"  -h            this help\n";
+"  -u            udp mode, otherwise http\n"
+"  -v            verbose\n";
 
 static void error() {
   syslog(LOG_ERR, "ERROR: (%d) %s", errno, strerror(errno));
