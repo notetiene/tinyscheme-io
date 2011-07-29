@@ -203,6 +203,8 @@ send_document_cb(struct evhttp_request *req, void *arg)
   pointer sc_return = sc->NIL;
   pointer sc_args   = sc->NIL;
 
+  pointer tmp = sc->NIL;
+
   struct stat st;
 
   method  = evhttp_method(evhttp_request_get_command(req));
@@ -261,18 +263,28 @@ send_document_cb(struct evhttp_request *req, void *arg)
 
   sc_return = scheme_apply1(sc, entry_point, sc_args);
 
-  evhttp_add_header(hdrs, "Content-Type", "text/html");
-  if (sc->vptr->is_string(sc_return)) {
-    status_code = 200;
-    phrase = "OK";
-    evbuffer_add_printf(evb, "%s", sc->vptr->string_value(sc_return));
-  } else if (sc->vptr->is_pair(sc_return)) {
-    char *phrase;
-    status_code   = sc->vptr->ivalue(sc->vptr->pair_car(sc_return));
-    phrase = sc->vptr->string_value(sc->vptr->pair_cdr(sc_return));
-    evbuffer_add_printf(evb, "(%d) %s", status_code, phrase);
-  } else {
-    syslog(LOG_ERR, "unexpected return type from scheme '%s' function", entry_point);
+  /* http status code and phrase */ 
+  tmp = sc->vptr->pair_car(sc_return);
+
+  status_code = sc->vptr->ivalue(sc->vptr->pair_car(tmp));
+  phrase      = sc->vptr->string_value(sc->vptr->pair_cdr(tmp));
+  tmp = sc->vptr->pair_cdr(sc_return);
+  for(; tmp != sc->NIL; tmp = sc->vptr->pair_cdr(tmp)) {
+    pointer p;
+    p = sc->vptr->pair_car(tmp);
+    if (sc->vptr->is_pair(p)) {
+      /* http headers */
+      const char *n, *v;
+      n = sc->vptr->string_value(sc->vptr->pair_car(p));
+      v = sc->vptr->string_value(sc->vptr->pair_cdr(p));
+      evhttp_add_header(hdrs, n, v);
+    } else if (sc->vptr->is_string(p)) {
+      const char *c;
+      c = sc->vptr->string_value(p);
+      evbuffer_add_printf(evb, "%s", c);
+    } else {
+      syslog(LOG_ERR, "unexpected return type from scheme '%s' function", entry_point);
+    }
   }
 done:
   if (status_code > 0) {

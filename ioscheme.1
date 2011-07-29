@@ -36,6 +36,12 @@ The data is passed to the function as the single argument.
 In the case of the HTTP server mode, 
 four arguments will be passed in this order:
 HTTP method, path, content, parameters.
+The function must return a list,
+with the first item a cons pair of HTTP
+status code (car) and http status phrase (cdr),
+followed by either, pairs representing 
+HTTP header name (car) value (cdr) pairs,
+or a string, the actual content.
 .IP -r
 .I
 DIRECTORY
@@ -60,7 +66,10 @@ ioscheme -v -p 8000 -e receive init.scm string.scm web.scm
 The scheme entry point function should look something like:
 .IP
 (define (receive method path body parameters)
-  ( "Hello, World!"))
+  (list 
+    (cons 200 "OK") 
+    (cons "Content-Type" "text/html") 
+    "Hello, World!"))
 .SH "AUTHORS"
 Tinyscheme was written by Atsushi Moriwaki, Akira KIDA, R.C. Secrist, D. Souflis.
 Ioscheme by A. Carl Douglas (carl.douglas@gmail.com).

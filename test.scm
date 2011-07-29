@@ -1,6 +1,8 @@
 
 
-(define (receive data)
-  (display (list->string (vector->list data)))(newline)
-  "THANKS FOR SENDING ME DATA!\n")
+(define (receive method path body parameters)
+  (list
+    (cons 200 "OK")
+    (cons "Content-Type" "text/html")
+    "Hello, World!"))
 
