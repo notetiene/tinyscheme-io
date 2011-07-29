@@ -4785,8 +4785,13 @@ void scheme_register_foreign_func_list(scheme * sc,
 pointer scheme_apply0(scheme *sc, const char *procname)
 { return scheme_eval(sc, cons(sc,mk_symbol(sc,procname),sc->NIL)); }
 
+#if 1
 pointer scheme_apply1(scheme *sc, const char *procname, pointer args)
 { return scheme_eval(sc, cons(sc,mk_symbol(sc,procname),args)); }
+#else
+pointer scheme_apply1(scheme *sc, const char *procname, pointer args)
+{ return scheme_call(sc, cons(sc,mk_symbol(sc,procname),sc->NIL), args); }
+#endif
 
 void save_from_C_call(scheme *sc)
 {
@@ -4816,14 +4821,14 @@ pointer scheme_call(scheme *sc, pointer func, pointer args)
 {
   int old_repl = sc->interactive_repl;
   sc->interactive_repl = 0;
-  save_from_C_call(sc);
+  /*save_from_C_call(sc);*/
   sc->envir = sc->global_env;
   sc->args = args;
   sc->code = func;
   sc->retcode = 0;
   Eval_Cycle(sc, OP_APPLY);
   sc->interactive_repl = old_repl;
-  restore_from_C_call(sc);
+  /*restore_from_C_call(sc);*/
   return sc->value;
 }
 

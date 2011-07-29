@@ -1,9 +1,7 @@
-
+; sql helper functions
 (define run-query
   (lambda (sql)
+    ;(display sql)(newline)
     (let ((result (sqlite-query sql)))
-      (if result
-         (display result)
-         (display (sqlite-error))))
-      (newline)))
+      (if result result sqlite-error))))
 

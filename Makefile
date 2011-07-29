@@ -2,13 +2,17 @@
 
 VERSION := `date +%Y%m%d`
 
-DESTDIR =
+UNAME := $(shell uname)
+
 PREFIX  = /usr/local
 MANDIR  = $(PREFIX)/share/man
 
 CC      = gcc
 
-CFLAGS  =   -g -ggdb -pg
+CFLAGS  =
+LFLAGS  =
+
+CFLAGS +=   -g -ggdb -pg
 #CFLAGS += -ansi
 CFLAGS += -Wno-long-long
 CFLAGS += -I/opt/local/include
@@ -20,7 +24,18 @@ CFLAGS += -DUSE_INTERFACE=1 \
 	  -DUSE_ERROR_HOOK=1 \
 	  -DUSE_ASCII=1
 
-LFLAGS  =  -L/opt/local/lib -levent -levent_extra
+ifeq ($(UNAME),Linux)
+CFLAGS += -D_XOPEN_SOURCE=500 
+CFLAGS += -D_BSD_SOURCE
+LFLAGS +=  -L/usr/local/lib
+LFLAGS +=  -lm -ldl
+endif
+
+ifeq ($(UNAME),Darwin)
+LFLAGS +=  -L/opt/local/lib 
+endif
+
+LFLAGS += -levent -levent_extra
 
 INC     =
 SRC     =  main.c scheme.c scheme_sqlite.c
@@ -31,6 +46,7 @@ BIN     = ioscheme
 LIB     =
 
 default: all
+	@echo " === $(BIN) built for $(UNAME) === "
 
 all:	$(BIN)
 
@@ -43,22 +59,21 @@ $(BIN): $(OBJ)
 clean:
 	rm -f $(OBJ) $(BIN) *.o
 
-test: $(BIN)
-	nc -u 127.0.0.1 8000
-	#@[ $$? = 0 ] && echo "PASSED OK."
-
 install: $(BIN)
-	install -v $(BIN) $(DEST)/bin
+	install -v $(BIN) $(PREFIX)/bin
 
 install-man:
-	install -d $(DESTDIR)$(MANDIR)/man1
-	install -m 0644 ioscheme.1 $(DESTDIR)$(MANDIR)/man1
+	install -d $(MANDIR)/man1
+	install -m 0644 ioscheme.1 $(MANDIR)/man1
 
 uninstall:
-	rm -f $(DEST)/bin/$(BIN)
+	rm -f $(PREFIX)/bin/$(BIN)
 
 archive:
 	git archive --prefix=$(BIN)-$(VERSION)/ HEAD | gzip > $(BIN)-$(VERSION).tar.gz
 
-.PHONY: default clean test all install install-man uninstall archive
+help:
+	groff -man -Tascii ioscheme.1 | less
+
+.PHONY: default clean test all install install-man uninstall archive help
 

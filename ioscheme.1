@@ -4,9 +4,10 @@
 ioscheme \- an input event driven scheme interpreter
 .SH "SYNOPSIS"
 .B ioscheme
-.RB [  -vut  ]
+.RB [  -cdvut  ]
 .RB [  -p  \fIPORT\fR  ]
 .RB [  -e  \fIFUNCTION\fR  ]
+.RB [  -r  \fIDIRECTORY\fR  ]
 .RI [  files...  ]
 .PP
 .B ioscheme
@@ -14,6 +15,8 @@ ioscheme \- an input event driven scheme interpreter
 .SH "OPTIONS"
 .IP -v
 Verbose mode.
+.IP -d
+Run in the background.
 .IP -u
 Listen on a UDP socket. 
 .IP -t
@@ -30,18 +33,34 @@ FUNCTION
 scheme entry point. The name of a scheme function 
 that will be called when data is received.
 The data is passed to the function as the single argument.
-In the case of the HTTP server mode, two arguments will be passed:
-HTTP method and HTTP path.
+In the case of the HTTP server mode, 
+four arguments will be passed in this order:
+HTTP method, path, content, parameters.
+.IP -r
+.I
+DIRECTORY
+to be used as the document root. URI paths that match 
+a local regular file under this directory
+are transmitted by the HTTP response.
+.IP -c
+Change to the document root directory.
+Useful if started by init.
 .SH DESCRIPTION
 ioscheme listens on a port (udp or tcp) and evaluates a 
 scheme function when data is received.
 .PP
 With neither -u or -t specified, ioscheme functions
 as a basic HTTP server.
-.PP
 .SH EXAMPLE
+.PP
+To run ioscheme:
+.IP
 ioscheme -v -p 8000 -e receive init.scm string.scm web.scm
+.PP
+The scheme entry point function should look something like:
+.IP
+(define (receive method path body parameters)
+  ( "Hello, World!"))
 .SH "AUTHORS"
 Tinyscheme was written by Atsushi Moriwaki, Akira KIDA, R.C. Secrist, D. Souflis.
 Ioscheme by A. Carl Douglas (carl.douglas@gmail.com).
-

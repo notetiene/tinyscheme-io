@@ -1,3 +1,5 @@
+; html helper functions
+; Copyright (C) 2011 A. Carl Douglas (carl.douglas@gmail.com)
 
 (define (sexp->attributes l)
   (apply 
@@ -27,5 +29,5 @@
         ((symbol? html) (string-append (symbol->string html) " "))
         (#t html)))
 
-(display (sexp->html '(test @ ((hello "world")))))
+;(display (sexp->html '(test @ ((hello "world")))))
 

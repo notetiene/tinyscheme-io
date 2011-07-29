@@ -102,14 +102,17 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
     }
   }
   changes = sqlite3_changes(db);
-  if (num_rows == 0) {
+#if 0
+  if (changes > 0) {
     char out[64];
     sprintf(out, "%d rows affected.", changes);
     sc_results = sp->vptr->mk_string(sp, out);
-  } else {
+  } else 
+#endif
+  {
     sc_results = sp->vptr->mk_vector(sp, num_rows);
     for(i = 0 ; i < num_rows ; i++) {
-      sp->vptr->set_vector_elem(sc_results, row_index, rows[i]);
+      sp->vptr->set_vector_elem(sc_results, i, rows[i]);
     }
   }
 

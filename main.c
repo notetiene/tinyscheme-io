@@ -9,6 +9,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/queue.h> /* event keyvalq */
+#include <sys/stat.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -17,15 +19,18 @@
 #include <string.h>
 #include <syslog.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <time.h>
 
 #include <event2/event.h>
 #include <event2/http.h>
-#include <event2/buffer.h>
 #include <event2/bufferevent.h>
+#include <event2/bufferevent_compat.h>
+#include <event2/buffer.h>
 #include <event2/listener.h>
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
-
 
 /*#include "scheme.h"*/
 #include "scheme-private.h"
@@ -36,24 +41,140 @@ extern void init_scheme_sqlite3(scheme *);
 
 static unsigned verbose = 0;
 static unsigned is_daemon = 0;
+static unsigned want_chdir = 0;
 
 static unsigned short iport = 8000;
 static scheme *sc = NULL;
 static const char *entry_point = "receive";
 
+static char *docroot = NULL;
+
 static const char help[] =
 "ioscheme \n"
-"  -d          run in the background\n"
-"  -e FUNCTION scheme entry point\n"
-"  -p PORT     port number\n"
-"  -u          udp mode, otherwise http\n"
-"  -t          tcp mode, otherwise http\n"
-"  -v          verbose\n"
-"  -h          this help\n";
+"  -c            change to document root directory\n"
+"  -d            run in the background\n"
+"  -e FUNCTION   scheme entry point\n"
+"  -p PORT       port number\n"
+"  -r DIRECTORY  the document root directory for serving static files from\n"
+"  -u            udp mode, otherwise http\n"
+"  -t            tcp mode, otherwise http\n"
+"  -v            verbose\n"
+"  -h            this help\n";
 
 static void error() {
-  syslog(LOG_ERR, "ERROR: %s", strerror(errno));
-  exit(errno);
+  syslog(LOG_ERR, "ERROR: (%d) %s", errno, strerror(errno));
+  exit(1);
+}
+
+static const struct table_entry {
+        const char *extension;
+        const char *content_type;
+} content_type_table[] = {
+        { "txt", "text/plain" },
+        { "c", "text/plain" },
+        { "h", "text/plain" },
+        { "html", "text/html" },
+        { "htm", "text/htm" },
+        { "css", "text/css" },
+        { "gif", "image/gif" },
+        { "jpg", "image/jpeg" },
+        { "jpeg", "image/jpeg" },
+        { "png", "image/png" },
+        { "pdf", "application/pdf" },
+        { "ps", "application/postsript" },
+        { NULL, NULL },
+};
+
+/* got this from libevent samples, http-server */
+/* Try to guess a good content-type for 'path' */
+static const char *
+guess_content_type(const char *path)
+{
+        const char *last_period, *extension;
+        const struct table_entry *ent;
+        last_period = strrchr(path, '.');
+        if (!last_period || strchr(last_period, '/'))
+                goto not_found; /* no exension */
+        extension = last_period + 1;
+        for (ent = &content_type_table[0]; ent->extension; ++ent) {
+                if (!evutil_ascii_strcasecmp(ent->extension, extension))
+                        return ent->content_type;
+        }
+
+not_found:
+        return "application/misc";
+}
+
+
+/* got this from libevent, http.c, better if it was exposed from there? */
+/** Given an evhttp_cmd_type, returns a constant string containing the
+ * equivalent HTTP command, or NULL if the evhttp_command_type is
+ * unrecognized. */
+static const char *
+evhttp_method(enum evhttp_cmd_type type)
+{
+        const char *method;
+
+        switch (type) {
+        case EVHTTP_REQ_GET:
+                method = "GET";
+                break;
+        case EVHTTP_REQ_POST:
+                method = "POST";
+                break;
+        case EVHTTP_REQ_HEAD:
+                method = "HEAD";
+                break;
+        case EVHTTP_REQ_PUT:
+                method = "PUT";
+                break;
+        case EVHTTP_REQ_DELETE:
+                method = "DELETE";
+                break;
+        case EVHTTP_REQ_OPTIONS:
+                method = "OPTIONS";
+                break;
+        case EVHTTP_REQ_TRACE:
+                method = "TRACE";
+                break;
+        case EVHTTP_REQ_CONNECT:
+                method = "CONNECT";
+                break;
+        case EVHTTP_REQ_PATCH:
+                method = "PATCH";
+                break;
+        default:
+                method = NULL;
+                break;
+        }
+
+        return (method);
+}
+
+pointer query_fi_cons(const char *qs) {
+
+  pointer scl = sc->NIL;
+  struct evkeyvalq params;
+  struct evkeyval  *param;
+
+  TAILQ_INIT(&params);
+  evhttp_parse_query_str(qs, &params);
+
+  if (qs != NULL && (strlen(qs) > 0)) {
+    TAILQ_FOREACH(param, &params, next) {
+      pointer pp = sc->NIL, k, v;
+      if (param->key && param->value) {
+        k  = mk_symbol(sc, param->key);
+        v  = mk_symbol(sc, param->value);
+        pp = _cons(sc, k, v, 0);
+        scl = _cons(sc, pp, scl, 0);
+      }
+    }
+  }
+  scl = _cons(sc, scl, sc->NIL, 0);
+  scl = _cons(sc, mk_symbol(sc, "quote"), scl, 0);
+
+  return scl;
 }
 
 static void
@@ -62,47 +183,127 @@ send_document_cb(struct evhttp_request *req, void *arg)
   struct evbuffer *evb = NULL;
   const char *uri = evhttp_request_get_uri(req);
   struct evhttp_uri *decoded = NULL;
-  const char *path;
-  char *decoded_path;
-  char *whole_path = NULL;
+  const char *method = NULL;
+  const char *path   = NULL;
+  const char *query  = NULL;
+  char *decoded_path = NULL;
+  char *data         = NULL;
+  char local_path[255];
+  int len = 255;
+  int status_code = 0;
+  char *phrase = NULL;
+  int bytes_out = 0;
 
   struct evkeyvalq *hdrs;
 
-  pointer sc_method;
-  pointer sc_path;
-  pointer sc_return;
+  pointer sc_method = sc->NIL;
+  pointer sc_path   = sc->NIL;
+  pointer sc_params = sc->NIL;
+  pointer sc_data   = sc->NIL;
+  pointer sc_return = sc->NIL;
+  pointer sc_args   = sc->NIL;
 
-  switch(evhttp_request_get_command(req)) {
-    case EVHTTP_REQ_GET:
-      sc_method = mk_string(sc, "GET"); break;
-    case EVHTTP_REQ_POST:
-      sc_method = mk_string(sc, "POST"); break;
-  }
+  struct stat st;
 
+  method  = evhttp_method(evhttp_request_get_command(req));
   decoded = evhttp_uri_parse(uri);
-  path = evhttp_uri_get_path(decoded);
 
-  sc_path = mk_string(sc, path);
+  path    = evhttp_uri_get_path(decoded);
+  query   = evhttp_uri_get_query(decoded);
 
-  sc_path = mk_string(sc, path);
-  sc_return = scheme_apply1(sc, entry_point, _cons(sc, sc_method, _cons(sc, sc_path, sc->NIL, 0), 0));
+  /* uri unescape */
+  decoded_path = evhttp_uridecode(path, 0, NULL);
+  evutil_snprintf(local_path, len, "%s/%s", docroot, decoded_path);
 
-  evb = evbuffer_new();
-  evbuffer_add_printf(evb, "%s", sc->vptr->string_value(sc_return));
+  evb  = evbuffer_new();
   hdrs = evhttp_request_get_output_headers(req);
   evhttp_add_header(hdrs, "Server", "ioscheme");
-  evhttp_add_header(hdrs, "Content-Type", "text/html");
   evhttp_add_header(hdrs, "Connection", "close");
-  evhttp_send_reply(req, 200, "OK", evb);
 
-  if (decoded)
-    evhttp_uri_free(decoded);
-  if (decoded_path)
-    free(decoded_path);
-  if (whole_path)
-    free(whole_path);
-  if (evb)
-    evbuffer_free(evb);
+  /* just return regular files */
+  if ((stat(local_path, &st)==0) && (S_ISREG(st.st_mode))) {
+    int fd;
+    const char *type = guess_content_type(decoded_path);
+    if ((fd = open(local_path, O_RDONLY)) < 0) {
+      error();
+    }
+    if (fstat(fd, &st) < 0) {
+      error();
+    }
+    status_code = 200;
+    phrase = "OK";
+
+    evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type", type);
+    evbuffer_add_file(evb, fd, 0, st.st_size);
+    goto done;
+  }
+
+  sc_params = query_fi_cons(query);
+
+  sc_path   = mk_string(sc, path);
+  sc_method = mk_string(sc, method);
+
+  data      = evbuffer_pullup(evhttp_request_get_input_buffer(req), -1);
+  if (data && (strlen(data) > 0)) {
+    sc_data   = mk_string(sc, data);
+  } else {
+    sc_data   = mk_string(sc, "");
+  }
+  if (evhttp_request_get_command(req) == EVHTTP_REQ_POST) {
+    if (data && (strlen(data) > 0)) {
+      sc_data = query_fi_cons(data);
+    }
+  }
+  sc_args   = _cons(sc, sc_params, sc_args, 0);
+  sc_args   = _cons(sc, sc_data,   sc_args, 0);
+  sc_args   = _cons(sc, sc_path,   sc_args, 0);
+  sc_args   = _cons(sc, sc_method, sc_args, 0);
+
+  sc_return = scheme_apply1(sc, entry_point, sc_args);
+
+  evhttp_add_header(hdrs, "Content-Type", "text/html");
+  if (sc->vptr->is_string(sc_return)) {
+    status_code = 200;
+    phrase = "OK";
+    evbuffer_add_printf(evb, "%s", sc->vptr->string_value(sc_return));
+  } else if (sc->vptr->is_pair(sc_return)) {
+    char *phrase;
+    status_code   = sc->vptr->ivalue(sc->vptr->pair_car(sc_return));
+    phrase = sc->vptr->string_value(sc->vptr->pair_cdr(sc_return));
+    evbuffer_add_printf(evb, "(%d) %s", status_code, phrase);
+  } else {
+    syslog(LOG_ERR, "unexpected return type from scheme '%s' function", entry_point);
+  }
+done:
+  if (status_code > 0) {
+    bytes_out = evbuffer_get_length(evb);
+    evhttp_send_reply(req, status_code, phrase, evb);
+  }
+  if (verbose) {
+    /* use common log format */
+    /* host ident authuser date request status bytes */
+    char timeformat[255];
+    const char * host = evhttp_request_get_host(req);
+    const char * ident = "-";
+    const char * authuser = evhttp_find_header(evhttp_request_get_input_headers(req), "user-agent") ?: "-";
+    const char * req  = method;
+    struct tm td;
+    time_t clk;
+    time(&clk);
+    localtime_r(&clk, &td);
+
+    sprintf(timeformat, "%d/%d/%d:%02d:%02d:%02d %02ld%02ld",
+      td.tm_mday, td.tm_mon+1, td.tm_year+1900, 
+      td.tm_hour, td.tm_min, td.tm_sec, 
+      (td.tm_gmtoff/3600), (td.tm_gmtoff/60)%60);
+
+    syslog(LOG_INFO, 
+        "%s %s %s [%s] \"%s %s\" %d %d", 
+        host, ident, authuser, timeformat, req, path, status_code, bytes_out);
+  }
+  if (decoded)      evhttp_uri_free(decoded);
+  if (decoded_path) free(decoded_path);
+  if (evb)          evbuffer_free(evb);
 }
 
 static void conn_readcb(struct bufferevent *bev, void *user_data)
@@ -133,7 +334,7 @@ static void conn_readcb(struct bufferevent *bev, void *user_data)
     evbuffer_add_printf(dst, "%s", sc->vptr->string_value(sc_return));
     len = bufferevent_write_buffer(bev, dst);
     if (len < 0) {
-      syslog(LOG_ERR, "%s:%d error");
+      syslog(LOG_ERR, "%s:%d error", __FILE__ , __LINE__);
     }
   }
 }
@@ -159,7 +360,6 @@ static void accept_cb(struct evconnlistener *listener, evutil_socket_t fd,
   bufferevent_setcb(bev_in, conn_readcb, NULL, conn_eventcb, NULL);
   bufferevent_enable(bev_in, EV_READ|EV_WRITE);
 }
-
 
 static void udp_event_cb(evutil_socket_t fd, short events, void *user_data)
 {
@@ -196,10 +396,8 @@ signal_cb(evutil_socket_t sig, short events, void *user_data)
 static void
 event_logger(int sev, const char *msg) {
   int p = (sev == _EVENT_LOG_ERR) ? LOG_ERR : LOG_DEBUG;
-  syslog(p, msg);
+  syslog(p, "%s", msg);
 }
-
-
 
 int main (int argc, char *argv[]) {
 
@@ -207,6 +405,7 @@ int main (int argc, char *argv[]) {
 
   int ch;
   int index;
+  int opt;
 
   struct event_base *base;
   struct evhttp *http;
@@ -215,8 +414,12 @@ int main (int argc, char *argv[]) {
   struct event *socket_event;
   struct evconnlistener * listener;
 
-  while ((ch = getopt(argc, argv, "dvuthp:e:")) != -1) {
+  docroot = getenv("PWD");
+
+  while ((ch = getopt(argc, argv, "cdvuthp:e:r:")) != -1) {
     switch(ch) {
+      case 'c':
+        want_chdir = 1;
       case 'd':
         is_daemon = 1;
         break;
@@ -238,8 +441,11 @@ int main (int argc, char *argv[]) {
       case 'v':
         verbose = 1;
         break;
+      case 'r':
+        docroot = optarg;
+        break;
       case '?':
-        if (optopt == 'p' || optopt == 'e') {
+        if (optopt == 'p' || optopt == 'e' || optopt == 'r') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
         } else if (isprint (optopt)) {
           /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
@@ -248,10 +454,17 @@ int main (int argc, char *argv[]) {
     }
   }
 
-  openlog("ioscheme", LOG_PERROR | LOG_PID | LOG_NDELAY, LOG_USER);
+  opt = LOG_PID | LOG_NDELAY | LOG_PERROR;
+  openlog("ioscheme", opt, LOG_USER);
 
   if (is_daemon) {
     daemon(0,0);
+  }
+
+  if (want_chdir) {
+    if (chdir(docroot) < 0) {
+      error();
+    }
   }
 
   sc = scheme_init_new ();
@@ -283,6 +496,7 @@ int main (int argc, char *argv[]) {
   if (verbose) {
     syslog(LOG_INFO, "libevent %s ", event_get_version());
     syslog(LOG_INFO, "libevent base using %s", event_base_get_method(base));
+    syslog(LOG_INFO, "document root: %s", docroot);
   }
 
   signal_event = evsignal_new(base, SIGINT, signal_cb, (void *)base);
