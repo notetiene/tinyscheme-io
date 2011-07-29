@@ -35,14 +35,14 @@
     `(html
        (head
          (link @ ((type "text/css")(href "base.css")(rel "stylesheet")(media "screen")))
-         (title My page))
+         (title "ioscheme demonstration"))
        (body
          (div @ ((id "main"))
-           (p @ ((id "header")) (a @ ((href "/index")) "(ioscheme)"))
+           (p @ ((id "header")) (a @ ((href "/index")) (h1 "(ioscheme)")))
            (p (form @ ((method "post") (action "/index"))
                 (input @ ((type "text") (name "content")))
                 (input @ ((type "hidden") (name "token") (value "1234")))
-                (input @ ((type "submit")))))
+                (input @ ((type "submit") (value "post notice")))))
            (p ,(query->html notices)))))))
 
 (define (index-handler method body parameters)
@@ -69,6 +69,6 @@
           ((string-ci=? path "/delete-all") (delete-handler method body parameters))
       (#t (cons 404 "Not Found"))))
 
-;(display "Loaded web script.")(newline)
+(display "Loaded web script.")(newline)
 
 
