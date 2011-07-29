@@ -1,6 +1,6 @@
 # vim: tabstop=8 noexpandtab
 
-VERSION := `date +%Y%m%d`
+VERSION := $(shell date +%Y%m%d)
 
 UNAME := $(shell uname)
 
