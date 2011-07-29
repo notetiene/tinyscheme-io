@@ -1,4 +1,12 @@
 ; ioscheme bulletin board example
+; 
+; To make this work, run:
+;
+;   ./ioscheme -v -p 8000 init.scm bb.scm
+;
+; Then visit in a web browser:
+;   http://localhost:8000/
+;
 (load "html.scm")
 (load "sql.scm")
 
@@ -30,7 +38,7 @@
          (title My page))
        (body
          (div @ ((id "main"))
-           (p (a @ ((href "/index")) "(ioscheme)"))
+           (p @ ((id "header")) (a @ ((href "/index")) "(ioscheme)"))
            (p (form @ ((method "post") (action "/index"))
                 (input @ ((type "text") (name "content")))
                 (input @ ((type "hidden") (name "token") (value "1234")))
