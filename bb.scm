@@ -62,7 +62,7 @@
       (run-query
         (string-append
           "INSERT INTO notices (id, content) VALUES (NULL, '"
-            (symbol->string(cdr(assq 'content body)))
+            (sql-quote-escape (symbol->string(cdr(assq 'content body))))
           "');"))
       (list 
         (cons 200 "OK")
