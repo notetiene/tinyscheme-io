@@ -188,7 +188,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
   const char *path   = NULL;
   const char *query  = NULL;
   char *decoded_path = NULL;
-  char *data         = NULL;
+  unsigned char *data = NULL;
   char local_path[255];
   int len = 255;
   int status_code = 0;
@@ -247,14 +247,14 @@ send_document_cb(struct evhttp_request *req, void *arg)
   sc_method = mk_string(sc, method);
 
   data      = evbuffer_pullup(evhttp_request_get_input_buffer(req), -1);
-  if (data && (strlen(data) > 0)) {
-    sc_data   = mk_string(sc, data);
+  if (data && (strlen((char*)data) > 0)) {
+    sc_data   = mk_string(sc, (char*)data);
   } else {
     sc_data   = mk_string(sc, "");
   }
   if (evhttp_request_get_command(req) == EVHTTP_REQ_POST) {
-    if (data && (strlen(data) > 0)) {
-      sc_data = query_fi_cons(data);
+    if (data && (strlen((char*)data) > 0)) {
+      sc_data = query_fi_cons((char*)data);
     }
   }
   sc_args   = _cons(sc, sc_params, sc_args, 0);
@@ -324,7 +324,7 @@ static void conn_readcb(struct bufferevent *bev, void *user_data)
   struct evbuffer *src, *dst;
   size_t len;
   int i;
-  char *bytes;
+  unsigned char *bytes;
 
   pointer sc_return;
   pointer vector;
@@ -366,7 +366,6 @@ static void accept_cb(struct evconnlistener *listener, evutil_socket_t fd,
 {
   struct event_base *base = user_data;
   struct bufferevent *bev_in;
-  struct evbuffer *evb = NULL;
 
   bev_in = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE|BEV_OPT_DEFER_CALLBACKS);
 
@@ -462,8 +461,6 @@ int main (int argc, char *argv[]) {
       case '?':
         if (optopt == 'c' || optopt == 'e' || optopt == 'p' || optopt == 'r') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
-        } else if (isprint (optopt)) {
-          /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
         }
         return(1);
     }
