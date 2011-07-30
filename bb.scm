@@ -47,27 +47,47 @@
 
 (define (index-handler method body parameters)
   (cond
-    ((string-ci=? method "get") (list (cons 200 "OK")(cons "Content-Type" "text/html")(index-html (run-query all-notices))))
+    ((string-ci=? method "get") 
+      (list 
+        (cons 200 "OK")
+        (cons "Content-Type" "text/html")
+        (index-html (run-query all-notices))))
     ((string-ci=? method "post")
       (run-query
         (string-append
           "INSERT INTO notices (content) VALUES ('"
-          (symbol->string(cdr(assq 'content body)))
+            (symbol->string(cdr(assq 'content body)))
           "');"))
-      (list (cons 200 "OK")(cons "Content-Type" "text/html")(index-html (run-query all-notices))))
-    (#t (list (cons 405 "Method Not Allowed")(cons "Content-Type" "text/html")"Method not allowed"))))
+      (list 
+        (cons 200 "OK")
+        (cons "Content-Type" "text/html")
+        (index-html (run-query all-notices))))
+    (#t (list 
+          (cons 405 "Method Not Allowed")
+          (cons "Content-Type" "text/html")
+          "Method not allowed"))))
 
 (define (delete-handler method body parameters)
   (cond
     ((string-ci=? method "get") 
-      (run-query "DELETE FROM notices;") (list (cons 200 "OK")(cons "Content-Type" "text/html")(index-html (run-query all-notices))))
-    (#t (list (cons 405 "Method Not Allowed")(cons "Content-Type" "text/html")"Method not allowed"))))
+      (run-query "DELETE FROM notices;") 
+        (list 
+          (cons 200 "OK")
+          (cons "Content-Type" "text/html")
+          (index-html (run-query all-notices))))
+    (#t (list 
+          (cons 405 "Method Not Allowed")
+          (cons "Content-Type" "text/html")
+          "Method not allowed"))))
 
 (define (receive method path body parameters)
     (cond ((string-ci=? path "/")           (index-handler method body parameters))
           ((string-ci=? path "/index")      (index-handler method body parameters))
           ((string-ci=? path "/delete-all") (delete-handler method body parameters))
-      (#t (list (cons 404 "Not Found")(cons "Content-Type" "text/html") "Page does not exist" ))))
+      (#t (list 
+            (cons 404 "Not Found")
+            (cons "Content-Type" "text/html")
+            "Page not found" ))))
 
 (display "Loaded web script.")(newline)
 
