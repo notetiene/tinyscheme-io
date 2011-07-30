@@ -9,7 +9,7 @@
       (string-append
         (symbol->string (car x))
         "="
-        "\"" (car(cdr x)) "\""
+        "\"" (car(cdr x)) "\" "
         ))
      l)))
 
