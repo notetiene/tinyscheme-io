@@ -1,0 +1,11 @@
+In a terminal,
+
+  make
+  ./ioscheme -v init.scm bb.scm
+
+
+In a browser,
+
+  http://localhost:8000/
+
+
