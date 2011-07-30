@@ -48,10 +48,11 @@ static scheme *sc = NULL;
 static const char *entry_point = "receive";
 
 static char *docroot = NULL;
+static char *workdir = NULL;
 
 static const char help[] =
 "ioscheme \n"
-"  -c            change to document root directory\n"
+"  -c DIRECTORY  change to this directory\n"
 "  -d            run in the background\n"
 "  -e FUNCTION   scheme entry point\n"
 "  -h            this help\n"
@@ -428,10 +429,11 @@ int main (int argc, char *argv[]) {
 
   docroot = getenv("PWD");
 
-  while ((ch = getopt(argc, argv, "cde:hp:r:tuv")) != -1) {
+  while ((ch = getopt(argc, argv, "c:de:hp:r:tuv")) != -1) {
     switch(ch) {
       case 'c':
         want_chdir = 1;
+        workdir = optarg;
         break;
       case 'd':
         is_daemon = 1;
@@ -458,7 +460,7 @@ int main (int argc, char *argv[]) {
         docroot = optarg;
         break;
       case '?':
-        if (optopt == 'e' || optopt == 'p' || optopt == 'r') {
+        if (optopt == 'c' || optopt == 'e' || optopt == 'p' || optopt == 'r') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
         } else if (isprint (optopt)) {
           /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
@@ -475,7 +477,7 @@ int main (int argc, char *argv[]) {
   }
 
   if (want_chdir) {
-    if (chdir(docroot) < 0) {
+    if (chdir(workdir) < 0) {
       error();
     }
   }
@@ -555,7 +557,7 @@ int main (int argc, char *argv[]) {
     event_add(socket_event, NULL);
     if (verbose) {
       syslog(LOG_INFO, "bound to %s:%u",
-       inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
+        inet_ntoa(sin.sin_addr), ntohs(sin.sin_port));
     }
   }
   event_base_dispatch(base);

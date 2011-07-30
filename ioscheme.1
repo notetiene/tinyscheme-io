@@ -4,11 +4,12 @@
 ioscheme \- an input event driven scheme interpreter
 .SH "SYNOPSIS"
 .B ioscheme
-.RB [  -cdvut  ]
-.RB [  -p  \fIPORT\fR  ]
+.RB [  -dtuv  ]
+.RB [  -c  \fIDIR\fR  ]
 .RB [  -e  \fIFUNCTION\fR  ]
-.RB [  -r  \fIDIRECTORY\fR  ]
-.RI [  files...  ]
+.RB [  -p  \fIPORT\fR  ]
+.RB [  -r  \fIDIR\fR  ]
+.RI [  FILES...  ]
 .PP
 .B ioscheme
 .RB [ -h ]
@@ -49,7 +50,9 @@ to be used as the document root. URI paths that match
 a local regular file under this directory
 are transmitted by the HTTP response.
 .IP -c
-Change to the document root directory.
+.I
+DIRECTORY
+Change to the directory before listening for connections.
 Useful if started by init.
 .SH DESCRIPTION
 ioscheme listens on a port (udp or tcp) and evaluates a 
