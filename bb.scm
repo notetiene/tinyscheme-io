@@ -17,6 +17,7 @@
 
 (define all-notices "SELECT id, content FROM notices;")
 
+; HTML fragment for a record
 (define (notice-html-fragment notice)
   (sexp->html
     `(div @ ((class "notice"))
@@ -24,6 +25,7 @@
         ":"
         ,(apply string-append (cdr notice)))))
 
+; Loops through SQL results
 (define (query->html v)
   (letrec ((fn (lambda (i s)
     (if (= (vector-length v) i)
@@ -32,6 +34,7 @@
              (string-append (notice-html-fragment (vector-ref v i)) s))))))
     (fn 0 "")))
 
+; View for index
 (define (index-html notices)
   (sexp->html
     `(html
@@ -47,6 +50,7 @@
                 (input @ ((type "submit") (value "post notice")))))
            (p ,(query->html notices)))))))
 
+; Controller for /
 (define (index-handler method body parameters)
   (cond
     ((string-ci=? method "get") 
@@ -69,6 +73,7 @@
           (cons "Content-Type" "text/html")
           "Method not allowed"))))
 
+; Controller for /delete-all
 (define (delete-handler method body parameters)
   (cond
     ((string-ci=? method "get") 
@@ -82,6 +87,7 @@
           (cons "Content-Type" "text/html")
           "Method not allowed"))))
 
+; URL router
 (define (receive method path body parameters)
     (cond ((string-ci=? path "/")           (index-handler method body parameters))
           ((string-ci=? path "/index")      (index-handler method body parameters))
