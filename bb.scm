@@ -45,7 +45,7 @@
          (div @ ((id "main"))
            (p @ ((id "header")) (a @ ((href "/index")) (h1 "(ioscheme)")))
            (p (form @ ((method "post") (action "/index"))
-                (input @ ((type "text") (name "content")))
+                (input @ ((type "text") (name "content") (size "24")))
                 (input @ ((type "hidden") (name "token") (value "1234")))
                 (input @ ((type "submit") (value "post notice")))))
            (p ,(query->html notices))
