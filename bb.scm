@@ -48,7 +48,8 @@
                 (input @ ((type "text") (name "content")))
                 (input @ ((type "hidden") (name "token") (value "1234")))
                 (input @ ((type "submit") (value "post notice")))))
-           (p ,(query->html notices)))))))
+           (p ,(query->html notices))
+           (p @ ((class "center")) (a @ ((href "/delete-all")) "delete notices")))))))
 
 ; Controller for /
 (define (index-handler method body parameters)
