@@ -286,6 +286,11 @@ send_document_cb(struct evhttp_request *req, void *arg)
     } else {
       syslog(LOG_ERR, "unexpected return type from scheme '%s' function", entry_point);
     }
+
+    if (tmp == sc->vptr->pair_cdr(tmp)) {
+      syslog(LOG_ERR, "infinite loop detected");
+      exit(1);
+    }
   }
 done:
   if (status_code > 0) {

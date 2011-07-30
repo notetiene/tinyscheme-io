@@ -14,7 +14,7 @@ LFLAGS  =
 
 CFLAGS +=   -g -ggdb -pg
 CFLAGS += -Wall
-#CFLAGS += -ansi
+CFLAGS += -ansi
 CFLAGS += -Wno-long-long
 CFLAGS += -I/opt/local/include
 CFLAGS += -DUSE_INTERFACE=1 \

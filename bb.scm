@@ -12,15 +12,17 @@
 
 (sqlite-open "data-bb.sqlite3")
 
-(run-query "SELECT sqlite_version()")
-(run-query "CREATE TABLE notices (content TEXT);")
+(run-query "SELECT sqlite_version();")
+(run-query "CREATE TABLE notices (id INTEGER PRIMARY KEY, content TEXT);")
 
-(define all-notices "SELECT * FROM notices;")
+(define all-notices "SELECT id, content FROM notices;")
 
 (define (notice-html-fragment notice)
   (sexp->html
     `(div @ ((class "notice"))
-        ,(apply string-append notice))))
+        ,(number->string (car notice))
+        ":"
+        ,(apply string-append (cdr notice)))))
 
 (define (query->html v)
   (letrec ((fn (lambda (i s)
@@ -55,7 +57,7 @@
     ((string-ci=? method "post")
       (run-query
         (string-append
-          "INSERT INTO notices (content) VALUES ('"
+          "INSERT INTO notices (id, content) VALUES (NULL, '"
             (symbol->string(cdr(assq 'content body)))
           "');"))
       (list 

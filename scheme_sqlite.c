@@ -28,6 +28,7 @@ static pointer scheme_sqlite_open(scheme *sp, pointer args) {
 
 static pointer scheme_sqlite_close(scheme *sp, pointer args) {
   sqlite3_close(db);
+  return sp->T;
 }
 
 static pointer scheme_sqlite_query(scheme *sp, pointer args) {
@@ -40,7 +41,6 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
   pointer sc_row;
   pointer sc_results;
   int num_rows = 0;
-  int row_index = 0;
   pointer *rows;
   int i = 0;
   int page_size = 0;
@@ -51,14 +51,7 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
   page_size = sysconf(_SC_PAGESIZE); /*getpagesize();*/
   rows_per_page = page_size / sizeof ( pointer );
 
-#if 0
-  printf("rows per page: %d\n", rows_per_page);
-  printf("page_size: %d\n", page_size);
-  printf("num of pages: %d\n", (int)(1 + (max_rows * sizeof(pointer) / page_size)) );
-  printf("allocating: %d\n", (int) (1 + (max_rows * sizeof(pointer) / page_size)) * page_size );
-#endif
-
-  rows = valloc( (1 + (max_rows * sizeof(pointer) / page_size) * page_size ));
+  rows = malloc( (1 + (max_rows * sizeof(pointer) / page_size) * page_size ));
 
   arg1 = sp->vptr->pair_car(args);
   if (!sp->vptr->is_string(arg1))
@@ -81,19 +74,16 @@ static pointer scheme_sqlite_query(scheme *sp, pointer args) {
 
       for(i=(cols-1); i>=0; i--) {
         pointer sc_field;
-        const char *field;
-        /*
-        sqlite3_value *v;
+        const unsigned char *field;
         int type;
         type = sqlite3_column_type(pst, i);
-        if (type == SQLITE_INTEGER) {
-        } else if (type == SQLITE3_TEXT) {
-        }
-        */
         field = sqlite3_column_text(pst, i);
-        sc_field = sp->vptr->mk_string(sp, field);
+        if (type == SQLITE_INTEGER) {
+          sc_field = sp->vptr->mk_integer(sp, atoi((char *)field));
+        } else {
+          sc_field = sp->vptr->mk_string(sp, (char *)field);
+        }
         sc_row   = sp->vptr->cons(sp, sc_field, sc_row);
-        /*v = sqlite3_column_value(pst, i);*/
       }
       rows[num_rows] = sc_row;
       num_rows++;
