@@ -268,7 +268,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
 
   status_code = sc->vptr->ivalue(sc->vptr->pair_car(tmp));
   phrase      = sc->vptr->string_value(sc->vptr->pair_cdr(tmp));
-  tmp = sc->vptr->pair_cdr(sc_return);
+  tmp         = sc->vptr->pair_cdr(sc_return);
   for(; tmp != sc->NIL; tmp = sc->vptr->pair_cdr(tmp)) {
     pointer p;
     p = sc->vptr->pair_car(tmp);
@@ -304,7 +304,7 @@ done:
     time(&clk);
     localtime_r(&clk, &td);
 
-    sprintf(timeformat, "%d/%d/%d:%02d:%02d:%02d %02ld%02ld",
+    sprintf(timeformat, "%02d/%02d/%04d:%02d:%02d:%02d %02ld%02ld",
       td.tm_mday, td.tm_mon+1, td.tm_year+1900, 
       td.tm_hour, td.tm_min, td.tm_sec, 
       (td.tm_gmtoff/3600), (td.tm_gmtoff/60)%60);
@@ -428,10 +428,11 @@ int main (int argc, char *argv[]) {
 
   docroot = getenv("PWD");
 
-  while ((ch = getopt(argc, argv, "cdvuthp:e:r:")) != -1) {
+  while ((ch = getopt(argc, argv, "cde:hp:r:tuv")) != -1) {
     switch(ch) {
       case 'c':
         want_chdir = 1;
+        break;
       case 'd':
         is_daemon = 1;
         break;
@@ -443,7 +444,7 @@ int main (int argc, char *argv[]) {
         break;
       case 'h':
         puts(help);
-        return(0);
+        return(1);
       case 'u':
         server_type = UDP;
         break;
@@ -457,7 +458,7 @@ int main (int argc, char *argv[]) {
         docroot = optarg;
         break;
       case '?':
-        if (optopt == 'p' || optopt == 'e' || optopt == 'r') {
+        if (optopt == 'e' || optopt == 'p' || optopt == 'r') {
           fprintf (stderr, "Option -%c requires an argument.\n", optopt);
         } else if (isprint (optopt)) {
           /*fprintf (stderr, "Unknown option `-%c'.\n", optopt);*/
