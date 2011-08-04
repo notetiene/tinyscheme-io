@@ -39,7 +39,8 @@ endif
 LFLAGS += -levent -levent_extra
 
 INC     =
-SRC     =  main.c scheme.c scheme_sqlite.c
+SRC     =  main.c scheme.c \
+	   scheme_sqlite.c b64.c
 #SRC    += dynload.c
 
 OBJ     = $(SRC:.c=.o)

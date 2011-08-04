@@ -35,6 +35,8 @@
 /*#include "scheme.h"*/
 #include "scheme-private.h"
 
+extern void base64_decode(char *src, char *dst);
+
 extern void init_scheme_sqlite3(scheme *);
 
 #define BUFFER_SIZE 4096
@@ -65,6 +67,20 @@ static const char help[] =
 static void error() {
   syslog(LOG_ERR, "ERROR: (%d) %s", errno, strerror(errno));
   exit(1);
+}
+
+static pointer scheme_base64_decode(scheme *sp, pointer args) {
+  char *str1, *str2;
+  pointer arg1, retval;
+  arg1 = sp->vptr->pair_car(args);
+  if (!sp->vptr->is_string(arg1))
+    return sp->F;
+  str1 = sp->vptr->string_value(arg1);
+  str2 = malloc( (strlen(str1) * 3 / 4) + 1 );
+  base64_decode(str1, str2);
+  retval = sp->vptr->mk_string(sp, str2);
+  free(str2);
+  return retval;
 }
 
 static const struct table_entry {
@@ -165,9 +181,10 @@ pointer query_fi_cons(const char *qs) {
     TAILQ_FOREACH(param, &params, next) {
       pointer pp = sc->NIL, k, v;
       if (param->key && param->value) {
-        k  = mk_symbol(sc, param->key);
-        v  = mk_symbol(sc, param->value);
-        pp = _cons(sc, k, v, 0);
+        k  = mk_string(sc, param->key);
+        v  = mk_string(sc, param->value);
+        pp = _cons(sc, v, sc->NIL, 0);
+        pp = _cons(sc, k, pp, 0);
         scl = _cons(sc, pp, scl, 0);
       }
     }
@@ -175,6 +192,26 @@ pointer query_fi_cons(const char *qs) {
   scl = _cons(sc, scl, sc->NIL, 0);
   scl = _cons(sc, mk_symbol(sc, "quote"), scl, 0);
 
+  return scl;
+}
+
+pointer headers_fi_cons(struct evkeyvalq * hdrs) {
+  pointer scl = sc->NIL;
+  struct evkeyval  *param;
+  TAILQ_FOREACH(param, hdrs, next) {
+    pointer pp = sc->NIL;
+    pointer k, v;
+    if (param->key && param->value) {
+      /*printf("%s=%s\n",param->key,param->value);*/
+      k  = mk_string(sc, param->key);
+      v  = mk_string(sc, param->value);
+      pp = _cons(sc, v, sc->NIL, 0);
+      pp = _cons(sc, k, pp, 0);
+      scl = _cons(sc, pp, scl, 0);
+    }
+  }
+  scl = _cons(sc, scl, sc->NIL, 0);
+  scl = _cons(sc, mk_symbol(sc, "quote"), scl, 0);
   return scl;
 }
 
@@ -195,7 +232,8 @@ send_document_cb(struct evhttp_request *req, void *arg)
   char *phrase = NULL;
   int bytes_out = 0;
 
-  struct evkeyvalq *hdrs;
+  struct evkeyvalq *ihdrs;
+  struct evkeyvalq *ohdrs;
 
   pointer sc_method = sc->NIL;
   pointer sc_path   = sc->NIL;
@@ -203,6 +241,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
   pointer sc_data   = sc->NIL;
   pointer sc_return = sc->NIL;
   pointer sc_args   = sc->NIL;
+  pointer sc_headers= sc->NIL;
 
   pointer tmp = sc->NIL;
 
@@ -214,14 +253,16 @@ send_document_cb(struct evhttp_request *req, void *arg)
   path    = evhttp_uri_get_path(decoded);
   query   = evhttp_uri_get_query(decoded);
 
+  ihdrs   = evhttp_request_get_input_headers(req);
+
   /* uri unescape */
   decoded_path = evhttp_uridecode(path, 0, NULL);
   evutil_snprintf(local_path, len, "%s/%s", docroot, decoded_path);
 
   evb  = evbuffer_new();
-  hdrs = evhttp_request_get_output_headers(req);
-  evhttp_add_header(hdrs, "Server", "ioscheme");
-  evhttp_add_header(hdrs, "Connection", "close");
+  ohdrs = evhttp_request_get_output_headers(req);
+  evhttp_add_header(ohdrs, "Server", "ioscheme");
+  evhttp_add_header(ohdrs, "Connection", "close");
 
   /* just return regular files */
   if ((stat(local_path, &st)==0) && (S_ISREG(st.st_mode))) {
@@ -241,8 +282,8 @@ send_document_cb(struct evhttp_request *req, void *arg)
     goto done;
   }
 
+  sc_headers = headers_fi_cons(ihdrs);
   sc_params = query_fi_cons(query);
-
   sc_path   = mk_string(sc, path);
   sc_method = mk_string(sc, method);
 
@@ -257,6 +298,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
       sc_data = query_fi_cons((char*)data);
     }
   }
+  sc_args   = _cons(sc, sc_headers,sc_args, 0);
   sc_args   = _cons(sc, sc_params, sc_args, 0);
   sc_args   = _cons(sc, sc_data,   sc_args, 0);
   sc_args   = _cons(sc, sc_path,   sc_args, 0);
@@ -278,7 +320,7 @@ send_document_cb(struct evhttp_request *req, void *arg)
       const char *n, *v;
       n = sc->vptr->string_value(sc->vptr->pair_car(p));
       v = sc->vptr->string_value(sc->vptr->pair_cdr(p));
-      evhttp_add_header(hdrs, n, v);
+      evhttp_add_header(ohdrs, n, v);
     } else if (sc->vptr->is_string(p)) {
       const char *c;
       c = sc->vptr->string_value(p);
@@ -491,6 +533,12 @@ int main (int argc, char *argv[]) {
 
   /* register sqlite3 ffi with scheme environment */
   init_scheme_sqlite3(sc);
+
+  /* register base64 decode function */
+  sc->vptr->scheme_define(sc,sc->global_env,
+    sc->vptr->mk_symbol(sc,"base64-decode"),
+    sc->vptr->mk_foreign_func(sc, scheme_base64_decode));
+
 
   /* load all the other arguments as files into scheme */
   for (index = optind; index < argc; index++) {
