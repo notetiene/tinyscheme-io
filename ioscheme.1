@@ -35,13 +35,13 @@ scheme entry point. The name of a scheme function
 that will be called when data is received.
 The data is passed to the function as the single argument.
 In the case of the HTTP server mode, 
-four arguments will be passed in this order:
-HTTP method, path, content, parameters.
-The function must return a list,
+five arguments will be passed in this order:
+HTTP method, path, content, parameters, headers.
+The scheme function must return a list,
 with the first item a cons pair of HTTP
 status code (car) and http status phrase (cdr),
 followed by either, pairs representing 
-HTTP header name (car) value (cdr) pairs,
+HTTP header name and value pairs,
 or a string, the actual content.
 .IP -r
 .I
@@ -68,7 +68,7 @@ ioscheme -v -p 8000 -e receive init.scm test.scm
 .PP
 The scheme entry point function should look something like:
 .IP
-(define (receive method path body parameters)
+(define (receive method path body parameters headers)
   (list 
     (cons 200 "OK") 
     (cons "Content-Type" "text/html") 
