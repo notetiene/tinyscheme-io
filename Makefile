@@ -39,7 +39,7 @@ endif
 LFLAGS += -levent -levent_extra
 
 INC     =
-SRC     =  main.c scheme.c \
+SRC     =  main.c http.c scheme.c \
 	   scheme_sqlite.c b64.c
 #SRC    += dynload.c
 
