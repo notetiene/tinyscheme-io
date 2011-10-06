@@ -75,7 +75,7 @@ archive:
 	git archive --prefix=$(BIN)-$(VERSION)/ HEAD | gzip > $(BIN)-$(VERSION).tar.gz
 
 help:
-	groff -man -Tascii ioscheme.1 | less
+	groff -man -Tascii ioscheme.1 | less -R
 
 .PHONY: default clean test all install install-man uninstall archive help
 
